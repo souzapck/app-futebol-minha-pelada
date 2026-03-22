@@ -12,7 +12,7 @@ try:
         database="postgres",
         user="postgres",
         password="Pa13be11so.89", 
-        port="5432"
+        port="6543"
     )
     cursor = conn.cursor()
     
