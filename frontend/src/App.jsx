@@ -5,6 +5,8 @@ import TeamsPage from "./pages/TeamsPage.jsx";
 import RankingPage from "./pages/RankingPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import "./App.css";
+import api from "./api.js";
+
 
 function App() {
   const [view, setView] = useState("matches"); 

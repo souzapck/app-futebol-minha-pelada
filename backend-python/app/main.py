@@ -324,15 +324,36 @@ class PasswordUpdate(BaseModel):
 # ROTA: Trocar a Senha
 @app.put("/api/users/{player_id}/password")
 def change_password(player_id: int, data: PasswordUpdate, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.player_id == player_id).first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="Usuário não possui login")
     
-    # ATENÇÃO: Se no seu sistema você usa 'get_password_hash' para criptografar, envolva o data.new_password nele.
-    # Caso contrário, se estiver salvando texto puro para teste, deixe assim:
-    db_user.hashed_password = data.new_password 
+    # 1. Tenta achar o usuário de login
+    db_user = db.query(models.User).filter(models.User.player_id == player_id).first()
+    
+    # 2. SE NÃO EXISTIR LOGIN, VAMOS CRIAR NA HORA!
+    if not db_user:
+        # Busca os dados do jogador para pegar o telefone dele
+        player = db.query(models.Player).filter(models.Player.id == player_id).first()
+        
+        # Se o jogador não tiver telefone, o sistema não consegue criar o login
+        if not player or not player.phone:
+            raise HTTPException(status_code=400, detail="Este jogador não tem telefone. Edite ele e adicione o WhatsApp primeiro!")
+            
+        # Cria um novo usuário automaticamente com o telefone do jogador e a senha digitada
+        new_user = models.User(
+            phone=player.phone, 
+            password=data.new_password, 
+            is_admin=False, 
+            player_id=player.id
+        )
+        db.add(new_user)
+        db.commit()
+        return {"message": "Usuário criado e senha definida com sucesso!"}
+    
+    # 3. SE O USUÁRIO JÁ EXISTIR, APENAS ATUALIZA A SENHA NORMALMENTE
+    db_user.password = data.new_password 
     db.commit()
+    
     return {"message": "Senha atualizada com sucesso!"}
+
 
 # ROTA: Dar ou tirar o Administrador
 @app.put("/api/users/{player_id}/admin")

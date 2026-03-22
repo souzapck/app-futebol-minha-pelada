@@ -32,6 +32,20 @@ export default function PlayersPage({ user }) {
     }
   };
 
+  // Função para o Administrador resetar a senha de qualquer jogador
+  const resetarSenha = async (jogadorId, nomeJogador) => {
+    const novaSenha = window.prompt(`🔄 Digite a nova senha provisória para ${nomeJogador}:`);
+    if (!novaSenha) return; // Se o admin cancelar, cancela a ação
+
+    try {
+      await api.put(`/users/${jogadorId}/password`, { new_password: novaSenha });
+      alert(`✅ A senha de ${nomeJogador} foi alterada para: ${novaSenha}`);
+    } catch (e) {
+      // Pega a mensagem de erro que o Python mandou (ex: "Este jogador não tem telefone...")
+      const erroReal = e.response?.data?.detail || "Erro desconhecido ao alterar senha.";
+      alert(`❌ ${erroReal}`);
+    }
+  };
 
 
   useEffect(() => {
@@ -186,6 +200,18 @@ export default function PlayersPage({ user }) {
                     {p.id === user.player_id ? "🔒 Você" : p.is_admin ? "🔑 Tirar Admin" : "⚽ Dar Admin"}
                   </button>                
                   
+                  {/* NOVO: BOTÃO DE RESETAR SENHA */}
+                  <button 
+                    onClick={() => resetarSenha(p.id, p.name)} 
+                    style={{ 
+                      background: "#fff3cd", color: "#856404", border: "1px solid #ffeeba", 
+                      padding: "6px", borderRadius: "6px", cursor: "pointer", 
+                      fontSize: "13px", fontWeight: "bold", width: "100%", textAlign: "center" 
+                    }}
+                  >
+                    🔄 Resetar Senha
+                  </button>
+
                   {/* BOTÃO DE EDITAR */}
                   <button 
                     onClick={() => startEdit(p)} 
