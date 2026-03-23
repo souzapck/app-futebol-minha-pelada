@@ -9,7 +9,7 @@ class Player(Base):
     rating = Column(Float)
     position = Column(String)
     shirt_number = Column(Integer, nullable=True)
-    phone = Column(String, nullable=True, unique=True)
+    phone = Column(String, nullable=True )#  , unique=True)
     
     #removido pois foi criada a tabela de usuarios
     #is_admin = Column(Boolean, default=False) # Novo campo Admin
