@@ -10,7 +10,9 @@ class Player(Base):
     position = Column(String)
     shirt_number = Column(Integer, nullable=True)
     phone = Column(String, nullable=True, unique=True)
-    is_admin = Column(Boolean, default=False) # Novo campo Admin
+    
+    #removido pois foi criada a tabela de usuarios
+    #is_admin = Column(Boolean, default=False) # Novo campo Admin
 
 # NOVA TABELA DE LOGIN
 class User(Base):

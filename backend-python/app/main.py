@@ -375,6 +375,7 @@ def toggle_admin(player_id: int, db: Session = Depends(get_db)):
     # Inverte o valor atual (Se era True vira False, se era False vira True)
     db_user.is_admin = not db_user.is_admin
     db.commit()
+    db.refresh(db_user)
     return {"is_admin": db_user.is_admin}
 
 
