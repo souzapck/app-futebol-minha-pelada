@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from .database import Base, engine, SessionLocal
-from . import models, schemas, crud, team_balancer
+from database import Base, engine, SessionLocal
+import models, schemas, crud, team_balancer
 from sqlalchemy import func
 from pydantic import BaseModel
 
