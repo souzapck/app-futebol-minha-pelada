@@ -6,7 +6,7 @@ import models, schemas, crud, team_balancer
 from sqlalchemy import func
 from pydantic import BaseModel
 
-Base.metadata.create_all(bind=engine)
+#Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
