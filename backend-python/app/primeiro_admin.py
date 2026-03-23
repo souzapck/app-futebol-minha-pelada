@@ -1,6 +1,6 @@
 import psycopg2
 
-print("🌟 Reset + Patrick Admin...")
+print("🌟 Reset + Admin...")
 
 conn = psycopg2.connect(
     host="db.kryojhxwmlkufzavjmgj.supabase.co",
@@ -20,17 +20,17 @@ cursor.execute("DELETE FROM players;")
 # Patrick Admin SIMPLES
 cursor.execute("""
     INSERT INTO players (name, position, rating, shirt_number, phone)
-    VALUES ('Patrick', 'MEI', 3.5, 20, '48999708632') RETURNING id;
+    VALUES ('Admin', 'MEI', 5, 00, '00000000000') RETURNING id;
 """)
 player_id = cursor.fetchone()[0]
 
 cursor.execute("""
     INSERT INTO users (phone, password, is_admin, player_id)
-    VALUES ('48999708632', '8632', true, %s);
+    VALUES ('00000000000', '0000', true, %s);
 """, (player_id,))
 
 conn.commit()
 cursor.close()
 conn.close()
 
-print("✅ Patrick Admin criado! Login: 48999708632 / 8632")
+print("✅ Admin criado! Login: 00000000000 / 0000")

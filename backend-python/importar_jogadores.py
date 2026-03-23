@@ -14,21 +14,19 @@ JOGADORES = [
     ("Hentony", 3.0, "MEI", 10, "48 98455-3623"),
     ("Isaac", 3.5, "MEI", 2, "48 98818-9816"),
     ("Israel", 2.5, "MEI", 79, "48 98433-9723"),
-    ("Johny", 2.5, "ZAG", 5, "48 9205-7176"),
+    ("Johny", 2.5, "ZAG", 5, "48 99205-7176"),
     ("Jose", 2.5, "GOL", 12, "48 99211-6714"),
-    ("Kiko", 3.5, "GOL", 1, "48 9992-6882"),
+    ("Kiko", 3.5, "GOL", 1, "48 99992-6882"),
     ("Kleiton", 2.5, "ZAG", 9, "48 98429-4941"),
     ("Leandro CRF", 3.0, "ATA", None, "48 99845-7260"),
     ("Maicon", 2.5, "ZAG", 8, "48 99206-2528"),
     ("Marcio", 3.0, "MEI", 17, "48 99101-4803"),
-    ("Patrick", 3.5, "MEI", 20, "48 99970-8632"),
     ("Vagner", 3.0, "ATA", 2, "48 99108-8717"),
     ("Rodolfo", 3.0, "ATA", 5, "48 99921-3378"),
     ("Geron", 2.0, "ZAG", 6, "48 98416-1810"),
     ("Convidado 1", 3.0, "MEI", None, None),
     ("Convidado 2", 3.0, "MEI", None, None),
-    ("Convidado 3 ", 3.0, "MEI", None, None),
-    ("Convidado 4", 3.0, "MEI", None, None),
+
 ]
 
 def get_db():

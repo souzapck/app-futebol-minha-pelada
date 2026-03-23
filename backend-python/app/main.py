@@ -377,3 +377,5 @@ def toggle_admin(player_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"is_admin": db_user.is_admin}
 
+
+
