@@ -264,6 +264,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/login")
+@app.options("/login") 
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     phone = login_data.phone
     password = login_data.password
