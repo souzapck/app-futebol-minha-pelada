@@ -256,14 +256,17 @@ def get_ranking(db: Session = Depends(get_db)):
 # --- SISTEMA DE LOGIN E USUÁRIOS ---
 
 # Rota para fazer Login
+class LoginRequest(BaseModel):
+    phone: str
+    password: str
+
 @app.post("/api/login")
-async def login(request: Request, db: Session = Depends(get_db)):
-    data = await request.json()
-    phone = data.get("phone")
-    password = data.get("password")
+async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+    phone = login_data.phone
+    password = login_data.password
     
     # Limpa o telefone caso a pessoa digite espaços ou traços
-    phone_limpo = ''.join(filter(str.isdigit, str(phone))) if phone else ""
+    phone_limpo = ''.join(filter(str.isdigit, str(phone))) 
     
     user = db.query(models.User).filter(models.User.phone == phone_limpo).first()
     
@@ -285,36 +288,43 @@ async def login(request: Request, db: Session = Depends(get_db)):
 
 # Rota especial para Sincronizar Jogadores -> Usuários
 # Como você já tem jogadores cadastrados, precisamos criar os usuários deles!
-@app.get("/api/sync-users")  # <-- Mudei de post para get aqui!
+@app.get("/api/sync-users")
 def sync_users(db: Session = Depends(get_db)):
     players = db.query(models.Player).filter(models.Player.phone.isnot(None)).all()
-    count = 0
+    atualizados = 0
+    criados = 0
     
     for p in players:
-        # Limpa o telefone para garantir que só tenha números
         phone_limpo = ''.join(filter(str.isdigit, str(p.phone)))
+        if len(phone_limpo) < 10: continue
+            
+        senha = phone_limpo[-4:]  # Últimos 4 dígitos
         
-        # Só cria se tiver 10 ou 11 dígitos
-        if len(phone_limpo) >= 10:
-            user = db.query(models.User).filter(models.User.phone == phone_limpo).first()
-            if not user:
-                # Senha = últimos 4 dígitos do celular
-                senha = phone_limpo[-4:]
-                
-                # Regra extra: Se o nome for Patrick (ou o seu nome), ele já vira Admin!
-                admin_status = True if "patrick" in p.name.lower() else False
-                
-                novo_user = models.User(
-                    phone=phone_limpo,
-                    password=senha,
-                    player_id=p.id,
-                    is_admin=admin_status
-                )
-                db.add(novo_user)
-                count += 1
-                
+        user = db.query(models.User).filter(models.User.phone == phone_limpo).first()
+        
+        if user:
+            # ATUALIZA senha/telefone se já existe
+            user.password = senha
+            user.player_id = p.id
+            user.is_admin = "patrick" in p.name.lower()
+            atualizados += 1
+        else:
+            # CRIA novo usuário
+            novo_user = models.User(
+                phone=phone_limpo,
+                password=senha,
+                player_id=p.id,
+                is_admin="patrick" in p.name.lower()
+            )
+            db.add(novo_user)
+            criados += 1
+    
     db.commit()
-    return {"message": f"{count} usuários criados com sucesso e senhas geradas!"}
+    return {
+        "message": f"{criados} criados + {atualizados} atualizados!",
+        "senha_padrao": "últimos 4 dígitos do telefone"
+    }
+
 
 
 # Criamos um "molde" para receber a nova senha
