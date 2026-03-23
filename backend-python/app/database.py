@@ -1,12 +1,14 @@
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres.kryojhxwmlkufzavjmgj:Pa13be11so.89@db.kryojhxwmlkufzavjmgj.supabase.co:6543/postgres?sslmode=require")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql+psycopg2://postgres:Pa13be11so.89@db.kryojhxwmlkufzavjmgj.supabase.co:5432/postgres"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
 def get_db():
