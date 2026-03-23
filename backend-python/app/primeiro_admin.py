@@ -1,4 +1,5 @@
 import psycopg2
+import bcrypt
 
 print("🌟 Conectando ao Banco da Nuvem...")
 
@@ -12,7 +13,7 @@ try:
         database="postgres",
         user="postgres",
         password="Pa13be11so.89", 
-        port="6543"
+        port="5432"  # ✅ CORREÇÃO 1: Volta para 5432 (direto, IPv6 - funciona no seu PC)
     )
     cursor = conn.cursor()
     
@@ -38,7 +39,7 @@ try:
             player_id INTEGER REFERENCES players(id)
         );
     """)
-    conn.commit() # Salva as tabelas
+    conn.commit()
 
     print("👤 Inserindo o Administrador...")
     # 1. Cria o Jogador
@@ -49,18 +50,24 @@ try:
     
     player_id = cursor.fetchone()[0]
 
-    # 2. Cria o Usuário Admin
+    # 2. CRIPTOGRAFA a senha antes de salvar (igual o app faz!)
+    senha_bytes = MINHA_SENHA.encode('utf-8')
+    salt = bcrypt.gensalt()
+    senha_criptografada = bcrypt.hashpw(senha_bytes, salt).decode('utf-8')
+    
+    # 3. Cria o Usuário Admin com senha criptografada
     cursor.execute("""
         INSERT INTO users (phone, password, is_admin, player_id)
         VALUES (%s, %s, true, %s);
-    """, (MEU_NUMERO, MINHA_SENHA, player_id))
+    """, (MEU_NUMERO, senha_criptografada, player_id))
 
     conn.commit()
     cursor.close()
     conn.close()
 
-    print(f"✅ SUCESSO! O banco foi construído e o Admin {MEU_NOME} foi salvo na Nuvem!")
-    print("Vá no seu aplicativo oficial (no celular ou Vercel) e faça o login com o seu número e a senha 123.")
+    print(f"✅ SUCESSO! O Admin {MEU_NOME} foi salvo na Nuvem!")
+    print(f"Login: {MEU_NUMERO} + senha '{MINHA_SENHA}'")
+    print("Agora o app consegue ler a senha criptografada!")
 
 except Exception as e:
     print("❌ Erro:", e)
