@@ -1,12 +1,16 @@
-import axios from 'axios';
-
 const API_URL = import.meta.env.VITE_API_URL || 
-  import.meta.env.DEV 
-    ? 'http://127.0.0.1:8000'      // ← LOCAL
-    : 'https://app-futebol-minha-pelada-backend.onrender.com';  // ← PROD
+                "https://app-futebol-minha-pelada-backend.onrender.com";
 
-const api = axios.create({
-  baseURL: API_URL,
-});
-
-export default api;
+export default {
+  get: (endpoint) => fetch(`${API_URL}${endpoint}`).then(r => r.json()),
+  post: (endpoint, data) => fetch(`${API_URL}${endpoint}`, {
+    method: "POST", 
+    headers: {"Content-Type": "application/json"}, 
+    body: JSON.stringify(data)
+  }),
+  put: (endpoint, data) => fetch(`${API_URL}${endpoint}`, {
+    method: "PUT", 
+    headers: {"Content-Type": "application/json"}, 
+    body: JSON.stringify(data)
+  })
+};
