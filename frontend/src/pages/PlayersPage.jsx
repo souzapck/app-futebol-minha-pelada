@@ -263,36 +263,37 @@ export default function PlayersPage({ user }) {
               </div>
             ) : (
              
-              /* Formulário de Edição Expandido (aparece DENTRO do próprio cartão) */
-              <div style={{ background: "#fff", padding: "15px", borderRadius: "12px", border: "2px dashed #007bff", marginBottom: "20px" }}>
-                <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+/* Formulário de Edição Expandido (aparece DENTRO do próprio cartão) */
+              <div style={{ background: "#ffffff", padding: "15px", borderRadius: "12px", border: "2px dashed #0022ff", marginBottom: "0px" }}>
+                <form onSubmit={(e) => handleEditSubmit(e, p.id)} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   <div style={{ display: "flex", gap: "200px" }}> 
-                    <spam style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</spam>
-                    <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</spam>
+                    <span style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</span>
+                    <span style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</span>
                   </div>
-                  <div style={{ display: "flex", gap: "10px" }}>                                              
-                    <input style={{ flex: 1 }} placeholder="Nome *" required value={newForm.name} onChange={e => setNewForm({...newForm, name: e.target.value})} />
-                    <input  placeholder="WhatsApp" type="tel" value={newForm.phone} onChange={e => setNewForm({...newForm, phone: e.target.value})} />      
+                  <div style={{ display: "flex", gap: "10px" }}>                                      
+                    <input style={{ flex: 1 }} placeholder="Nome *" required value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                    <input  placeholder="WhatsApp" type="tel" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} />      
                   </div>            
                   <div style={{ display: "flex", gap: "35px" }}>
-                    <spam style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</spam>
-                    <spam style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</spam>              
-                    <spam style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</spam>
+                    <span style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</span>
+                    <span style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</span>              
+                    <span style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</span>
                   </div>
                   <div style={{ display: "flex", gap: "50px" }}>
-                    <select style={{ flex: 2}}  value={newForm.position} onChange={e => setNewForm({...newForm, position: e.target.value})}>
-                      {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                    <select style={{ flex: 2}}  value={editForm.position} onChange={e => setEditForm({...editForm, position: e.target.value})}>
+                      {POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                     </select> 
-                    <input style={{ flex: 2}} type="number" step="0.5" min="0.5" max="5" required value={newForm.rating} onChange={e => setNewForm({...newForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>             
-                    <input style={{ width: "70px"}}  placeholder="Nº 👕" type="number" value={newForm.shirt_number} onChange={e => setNewForm({...newForm, shirt_number: e.target.value})} />                            
-                    <spam style={{ color: "#374151", fontSize: "12px", width: "70px" }}></spam>
+                    <input style={{ flex: 2}} type="number" step="0.5" min="0.5" max="5" required value={editForm.rating} onChange={e => setEditForm({...editForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>            
+                    <input style={{ width: "70px"}}  placeholder="Nº 👕" type="number" value={editForm.shirt_number} onChange={e => setEditForm({...editForm, shirt_number: e.target.value})} />                            
+                    <span style={{ color: "#374151", fontSize: "12px", width: "70px" }}></span>
                   </div>
                   <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                    <button type="submit" style={{ flex: 1, padding: "12px", background: "#28a745", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Salvar</button>
-                    <button type="button" onClick={() => setShowNewForm(false)} style={{ padding: "12px", background: "#6c757d", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Cancelar</button>
+                    <button type="submit" style={{ flex: 1, padding: "12px", background: "#0022ff", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Salvar Edição</button>
+                    <button type="button" onClick={cancelEdit} style={{ padding: "12px", background: "#6c757d", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Cancelar</button>
                   </div>
                 </form>
               </div>
+
             )}
           </div>
         ))}
