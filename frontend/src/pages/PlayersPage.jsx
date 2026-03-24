@@ -155,23 +155,26 @@ export default function PlayersPage({ user }) {
         <div style={{ background: "#fff", padding: "15px", borderRadius: "12px", border: "2px dashed #007bff", marginBottom: "20px" }}>
           <h3 style={{ marginTop: 0, color: "#007bff" }}>👥 Novo Jogador</h3>
           <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div style={{ display: "flex", gap: "10px" }}> 
-              <spam style={{width: "100px", color: "#374151", fontSize: "12px" }}>👤 Nome *</spam>
-              <input style={{width: "100%"}} placeholder="Nome *" required value={newForm.name} onChange={e => setNewForm({...newForm, name: e.target.value})} />
-            </div>          
-            <div style={{ display: "flex", gap: "10px" }}>
-              <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>⚽ Posição *</spam>
-              <select style={{ flex: 1 }} value={newForm.position} onChange={e => setNewForm({...newForm, position: e.target.value})}>
-                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <spam style={{width: "150px", color: "#374151", fontSize: "12px" }}>⭐ Classif. (0,5 - 5)</spam>
-              <input style={{ flex: 1  }} type="number" step="0.5" min="0.5" max="5" required value={newForm.rating} onChange={e => setNewForm({...newForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>
-            </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</spam>
-              <input style={{ flex: 1 }} placeholder="Nº 👕" type="number" value={newForm.shirt_number} onChange={e => setNewForm({...newForm, shirt_number: e.target.value})} />
+            <div style={{ display: "flex", gap: "200px" }}> 
+              <spam style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</spam>
               <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</spam>
-              <input style={{ flex: 1 }} placeholder="WhatsApp" type="tel" value={newForm.phone} onChange={e => setNewForm({...newForm, phone: e.target.value})} />
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>                                              
+              <input style={{ flex: 1 }} placeholder="Nome *" required value={newForm.name} onChange={e => setNewForm({...newForm, name: e.target.value})} />
+              <input  placeholder="WhatsApp" type="tel" value={newForm.phone} onChange={e => setNewForm({...newForm, phone: e.target.value})} />      
+            </div>            
+            <div style={{ display: "flex", gap: "35px" }}>
+              <spam style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</spam>
+              <spam style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</spam>              
+              <spam style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</spam>
+            </div>
+            <div style={{ display: "flex", gap: "50px" }}>
+              <select style={{ flex: 2}}  value={newForm.position} onChange={e => setNewForm({...newForm, position: e.target.value})}>
+                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select> 
+              <input style={{ flex: 2}} type="number" step="0.5" min="0.5" max="5" required value={newForm.rating} onChange={e => setNewForm({...newForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>             
+              <input style={{ width: "70px"}}  placeholder="Nº 👕" type="number" value={newForm.shirt_number} onChange={e => setNewForm({...newForm, shirt_number: e.target.value})} />                            
+              <spam style={{ color: "#374151", fontSize: "12px", width: "70px" }}></spam>
             </div>
             <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
               <button type="submit" style={{ flex: 1, padding: "12px", background: "#28a745", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Salvar</button>
@@ -262,25 +265,27 @@ export default function PlayersPage({ user }) {
              
               /* Formulário de Edição Expandido (aparece DENTRO do próprio cartão) */
               <div style={{ background: "#fff", padding: "15px", borderRadius: "12px", border: "2px dashed #007bff", marginBottom: "20px" }}>
-                <h3 style={{ marginTop: 0, color: "#007bff" }}>👥 Novo Jogador</h3>
                 <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <div style={{ display: "flex", gap: "10px" }}> 
-                    <spam style={{width: "100px", color: "#374151", fontSize: "12px" }}>👤 Nome *</spam>
-                    <input style={{width: "100%"}} placeholder="Nome *" required value={newForm.name} onChange={e => setNewForm({...newForm, name: e.target.value})} />
-                  </div>          
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>⚽ Posição *</spam>
-                    <select style={{ flex: 1 }} value={newForm.position} onChange={e => setNewForm({...newForm, position: e.target.value})}>
-                      {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                    <spam style={{width: "150px", color: "#374151", fontSize: "12px" }}>⭐ Classif. (0,5 - 5)</spam>
-                    <input style={{ flex: 1  }} type="number" step="0.5" min="0.5" max="5" required value={newForm.rating} onChange={e => setNewForm({...newForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>
-                  </div>
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</spam>
-                    <input style={{ flex: 1 }} placeholder="Nº 👕" type="number" value={newForm.shirt_number} onChange={e => setNewForm({...newForm, shirt_number: e.target.value})} />
+                  <div style={{ display: "flex", gap: "200px" }}> 
+                    <spam style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</spam>
                     <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</spam>
-                    <input style={{ flex: 1 }} placeholder="WhatsApp" type="tel" value={newForm.phone} onChange={e => setNewForm({...newForm, phone: e.target.value})} />
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>                                              
+                    <input style={{ flex: 1 }} placeholder="Nome *" required value={newForm.name} onChange={e => setNewForm({...newForm, name: e.target.value})} />
+                    <input  placeholder="WhatsApp" type="tel" value={newForm.phone} onChange={e => setNewForm({...newForm, phone: e.target.value})} />      
+                  </div>            
+                  <div style={{ display: "flex", gap: "35px" }}>
+                    <spam style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</spam>
+                    <spam style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</spam>              
+                    <spam style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</spam>
+                  </div>
+                  <div style={{ display: "flex", gap: "50px" }}>
+                    <select style={{ flex: 2}}  value={newForm.position} onChange={e => setNewForm({...newForm, position: e.target.value})}>
+                      {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select> 
+                    <input style={{ flex: 2}} type="number" step="0.5" min="0.5" max="5" required value={newForm.rating} onChange={e => setNewForm({...newForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>             
+                    <input style={{ width: "70px"}}  placeholder="Nº 👕" type="number" value={newForm.shirt_number} onChange={e => setNewForm({...newForm, shirt_number: e.target.value})} />                            
+                    <spam style={{ color: "#374151", fontSize: "12px", width: "70px" }}></spam>
                   </div>
                   <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                     <button type="submit" style={{ flex: 1, padding: "12px", background: "#28a745", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Salvar</button>
@@ -288,8 +293,6 @@ export default function PlayersPage({ user }) {
                   </div>
                 </form>
               </div>
-
-
             )}
           </div>
         ))}
