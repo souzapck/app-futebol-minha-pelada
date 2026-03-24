@@ -263,21 +263,24 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/login")
-@app.options("/login") 
+#@app.options("/login") 
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
-    phone = login_data.phone
-    password = login_data.password
+    #phone = login_data.phone
+    #password = login_data.password
     
     # Limpa o telefone caso a pessoa digite espaços ou traços
-    phone_limpo = ''.join(filter(str.isdigit, str(phone))) 
+    #phone_limpo = ''.join(filter(str.isdigit, str(phone))) 
+    phone_limpo = ''.join(filter(str.isdigit, str(login_data.phone))) 
     
     user = db.query(models.User).filter(models.User.phone == phone_limpo).first()
     
-    if not user or user.password != str(password):
+    #if not user or user.password != str(password):
+    if not user or user.password != str(login_data.password):
         raise HTTPException(status_code=401, detail="Telefone ou senha incorretos")
         
     # Busca os dados do jogador para enviar pra tela
-    player = db.query(models.Player).filter(models.Player.id == user.id).first()
+    #player = db.query(models.Player).filter(models.Player.id == user.id).first()
+    player = db.query(models.Player).filter(models.Player.user_id == user.id).first()
     
     return {
         "message": "Login aprovado",
