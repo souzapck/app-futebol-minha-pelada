@@ -12,10 +12,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", 
-                   "http://localhost:3000" , 
-                   "https://minha-pelada-futquinta.vercel.app"
-                   ],
+    allow_origins=["https://minha-pelada-futquinta.vercel.app", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -263,7 +260,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/login")
-#@app.options("/login") 
+@app.options("/login") 
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     #phone = login_data.phone
     #password = login_data.password
@@ -280,7 +277,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         
     # Busca os dados do jogador para enviar pra tela
     #player = db.query(models.Player).filter(models.Player.id == user.id).first()
-    player = db.query(models.Player).filter(models.Player.user_id == user.id).first()
+    player = db.query(models.Player).filter(models.Player.id == user.player_id).first()
     
     return {
         "message": "Login aprovado",
