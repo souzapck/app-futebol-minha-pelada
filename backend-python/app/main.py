@@ -58,11 +58,11 @@ def read_players(db: Session = Depends(get_db)):
     return result
 
 
-@app.post("/api/players", response_model=schemas.Player)
+@app.post("/players", response_model=schemas.Player)
 def create_player(player: schemas.PlayerCreate, db: Session = Depends(get_db)):
     return crud.create_player(db, player)
 
-@app.put("/api/players/{player_id}", response_model=schemas.Player)
+@app.put("/players/{player_id}", response_model=schemas.Player)
 def update_player(player_id: int, player_update: schemas.PlayerCreate, db: Session = Depends(get_db)):
     db_player = db.query(models.Player).filter(models.Player.id == player_id).first()
     if not db_player:
@@ -86,7 +86,7 @@ def list_matches(db: Session = Depends(get_db)):
     # Lê todos os jogos direto do banco
     return db.query(models.Match).order_by(models.Match.id.desc()).all()
 
-@app.post("/api/matches")  # <-- Tirei o response_model
+@app.post("/matches")  # <-- Tirei o response_model
 async def create_match(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     db_match = models.Match(
@@ -103,7 +103,7 @@ async def create_match(request: Request, db: Session = Depends(get_db)):
 
 # Presenças
 
-@app.post("/api/matches/{match_id}/confirm")
+@app.post("/matches/{match_id}/confirm")
 async def confirm_player(match_id: int, request: Request, db: Session = Depends(get_db)):
     try:
         data = await request.json()
@@ -135,7 +135,7 @@ async def confirm_player(match_id: int, request: Request, db: Session = Depends(
 
 
 
-@app.get("/api/matches/{match_id}/players")
+@app.get("/matches/{match_id}/players")
 def get_match_players(match_id: int, db: Session = Depends(get_db)):
     match_players = db.query(models.MatchPlayer, models.Player)\
                       .join(models.Player, models.MatchPlayer.player_id == models.Player.id)\
@@ -155,7 +155,7 @@ def get_match_players(match_id: int, db: Session = Depends(get_db)):
     return result
 
 
-@app.delete("/api/matches/{match_id}")
+@app.delete("/matches/{match_id}")
 def delete_match(match_id: int, db: Session = Depends(get_db)):
     # 1. Busca a partida no banco
     match = db.query(models.Match).filter(models.Match.id == match_id).first()
@@ -177,7 +177,7 @@ def delete_match(match_id: int, db: Session = Depends(get_db)):
 
 
 
-@app.post("/api/matches/{match_id}/draw")
+@app.post("/matches/{match_id}/draw")
 async def save_draw(match_id: int, request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     match = db.query(models.Match).filter(models.Match.id == match_id).first()
@@ -202,7 +202,7 @@ async def save_draw(match_id: int, request: Request, db: Session = Depends(get_d
     db.commit()
     return {"message": "Sorteio processado"}
 
-@app.post("/api/matches/{match_id}/stats")
+@app.post("/matches/{match_id}/stats")
 async def save_stats(match_id: int, request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     match = db.query(models.Match).filter(models.Match.id == match_id).first()
@@ -219,7 +219,7 @@ async def save_stats(match_id: int, request: Request, db: Session = Depends(get_
 
 # --- RANKING ---
 
-@app.get("/api/ranking")
+@app.get("/ranking")
 def get_ranking(db: Session = Depends(get_db)):
     # Busca todos os jogadores
     players = db.query(models.Player).all()
@@ -291,7 +291,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 # Rota especial para Sincronizar Jogadores -> Usuários
 # Como você já tem jogadores cadastrados, precisamos criar os usuários deles!
-@app.get("/api/sync-users")
+@app.get("/sync-users")
 def sync_users(db: Session = Depends(get_db)):
     players = db.query(models.Player).filter(models.Player.phone.isnot(None)).all()
     atualizados = 0
@@ -335,7 +335,7 @@ class PasswordUpdate(BaseModel):
     new_password: str
 
 # ROTA: Trocar a Senha
-@app.put("/api/users/{player_id}/password")
+@app.put("/users/{player_id}/password")
 def change_password(player_id: int, data: PasswordUpdate, db: Session = Depends(get_db)):
     
     # 1. Tenta achar o usuário de login
@@ -369,7 +369,7 @@ def change_password(player_id: int, data: PasswordUpdate, db: Session = Depends(
 
 
 # ROTA: Dar ou tirar o Administrador
-@app.put("/api/users/{player_id}/admin")
+@app.put("/users/{player_id}/admin")
 def toggle_admin(player_id: int, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.player_id == player_id).first()
     if not db_user:
