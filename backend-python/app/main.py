@@ -277,13 +277,13 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Telefone ou senha incorretos")
         
     # Busca os dados do jogador para enviar pra tela
-    player = db.query(models.Player).filter(models.Player.id == user.player_id).first()
+    player = db.query(models.Player).filter(models.Player.id == user.id).first()
     
     return {
         "message": "Login aprovado",
         "user": {
-            "player_id": player.id,
-            "name": player.name,
+            "player_id": player.id if player else None,
+            "name": player.name if player else user.name,
             "phone": user.phone,
             "is_admin": user.is_admin
         }
