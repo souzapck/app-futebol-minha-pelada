@@ -134,9 +134,7 @@ async def confirm_player(match_id: int, request: Request, db: Session = Depends(
 
 @app.get("/matches/{match_id}/players")
 def get_match_players(match_id: int, db: Session = Depends(get_db)):
-    match_players = db.query(models.MatchPlayer, models.Player)\
-                      .join(models.Player, models.MatchPlayer.player_id == models.Player.id)\
-                      .filter(models.MatchPlayer.match_id == match_id).all()
+    match_players = db.query(models.MatchPlayer, models.Player).join(models.Player, models.MatchPlayer.player_id == models.Player.id).filter(models.MatchPlayer.match_id == match_id).all()
     result = []
     for mp, player in match_players:
         result.append({
@@ -225,10 +223,7 @@ def get_ranking(db: Session = Depends(get_db)):
     for p in players:
         # Busca todas as participações DESSE jogador onde o status é 'confirmado' e o jogo foi 'sorteado/jogado'
         # Uma forma simples é buscar os registros na tabela MatchPlayer onde o 'team' não é nulo (só ganha time quem joga)
-        participacoes = db.query(models.MatchPlayer)\
-                          .filter(models.MatchPlayer.player_id == p.id)\
-                          .filter(models.MatchPlayer.team.isnot(None))\
-                          .all()
+        participacoes = db.query(models.MatchPlayer).filter(models.MatchPlayer.player_id == p.id).filter(models.MatchPlayer.team.isnot(None)).all()
         
         jogos_jogados = len(participacoes)
         
