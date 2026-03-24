@@ -6,7 +6,7 @@ from . import models, schemas, crud, team_balancer
 from sqlalchemy import func
 from pydantic import BaseModel
 
-#Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -30,7 +30,7 @@ def get_db():
 
 # Jogadores
 
-@app.get("/api/players")
+@app.get("/players")
 def read_players(db: Session = Depends(get_db)):
     # 1. Pega todos os jogadores
     players = db.query(models.Player).all()
@@ -81,7 +81,7 @@ def update_player(player_id: int, player_update: schemas.PlayerCreate, db: Sessi
 
 # Jogos
 
-@app.get("/api/matches")  # <-- Tirei o response_model
+@app.get("/matches")  # <-- Tirei o response_model
 def list_matches(db: Session = Depends(get_db)):
     # Lê todos os jogos direto do banco
     return db.query(models.Match).order_by(models.Match.id.desc()).all()
@@ -104,7 +104,6 @@ async def create_match(request: Request, db: Session = Depends(get_db)):
 # Presenças
 
 @app.post("/api/matches/{match_id}/confirm")
-@app.post("/matches/{match_id}/confirm")
 async def confirm_player(match_id: int, request: Request, db: Session = Depends(get_db)):
     try:
         data = await request.json()
