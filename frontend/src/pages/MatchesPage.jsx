@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../api.js";
+import { supabase } from "../supabaseClient";
 
 // Lembre-se de receber o 'user' aqui na primeira linha
 export default function MatchesPage({ user }) {
@@ -13,19 +13,47 @@ export default function MatchesPage({ user }) {
   }, []);
 
   const loadData = async () => {
-    const resM = await api.get("/matches");
-    setMatches(resM.data);
-    const resP = await api.get("/players");
-    setPlayers(resP.data);
+    const { data: matchesData, error: matchesError } = await supabase
+      .from("matches")
+      .select("*")
+      .order("date", { ascending: false });
+
+    if (matchesError) {
+      console.error("Erro ao carregar partidas:", matchesError);
+      return;
+    }
+
+    const { data: playersData, error: playersError } = await supabase
+      .from("players")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (playersError) {
+      console.error("Erro ao carregar jogadores:", playersError);
+      return;
+    }
+
+    setMatches(matchesData || []);
+    setPlayers(playersData || []);
   };
 
   const loadConfirmations = async (matchId) => {
-    const res = await api.get(`/matches/${matchId}/players`);
-    const sMap = {};
-    res.data.forEach(item => {
-      sMap[item.id] = item.status;
+    const { data, error } = await supabase
+      .from("match_player")
+      .select("*")
+      .eq("match_id", matchId);
+
+    if (error) {
+      console.error("Erro ao carregar confirmações:", error);
+      return;
+    }
+
+    const novoStatusMap = {};
+    (data || []).forEach(item => {
+      novoStatusMap[item.player_id] = item.status;
     });
-    setStatusMap(sMap);
+
+    setStatusMap(novoStatusMap);
   };
 
   const getNextThursday = () => {
@@ -39,32 +67,77 @@ export default function MatchesPage({ user }) {
 
   const createMatch = async () => {
     const nextThu = getNextThursday();
+
     const matchExists = matches.some(m => m.date === nextThu);
-    
+
     if (matchExists) {
       alert("⚠️ O jogo da próxima quinta-feira já foi criado!");
-      return; 
+      return;
     }
 
-    const res = await api.post("/matches", { date: nextThu });
-    const newMatches = [res.data, ...matches];
+    const { data, error } = await supabase
+      .from("matches")
+      .insert([
+        {
+          date: nextThu,
+          is_drawn: false,
+          score_a: 0,
+          score_b: 0
+        }
+      ])
+      .select()
+      .single(); // 👈 importante!
+
+    if (error) {
+      alert("❌ Erro ao criar partida");
+      return;
+    }
+
+    const newMatches = [data, ...matches];
     setMatches(newMatches);
-    selectMatch(res.data);
+    selectMatch(data);
   };
 
   const deleteMatch = async (matchId) => {
-    const confirm = window.confirm("🗑️ Tem certeza que deseja excluir este jogo? Todos os dados serão apagados.");
-    if (!confirm) return;
+    const confirmDelete = window.confirm(
+      "🗑️ Tem certeza que deseja excluir este jogo? Todos os dados serão apagados."
+    );
+    if (!confirmDelete) return;
 
     try {
-      await api.delete(`/matches/${matchId}`);
+      // 1. apaga confirmações / gols / times ligados à partida
+      const { error: mpError } = await supabase
+        .from("match_player")
+        .delete()
+        .eq("match_id", matchId);
+
+      if (mpError) {
+        console.error(mpError);
+        alert("❌ Erro ao excluir dados da partida.");
+        return;
+      }
+
+      // 2. apaga a partida
+      const { error: matchError } = await supabase
+        .from("matches")
+        .delete()
+        .eq("id", matchId);
+
+      if (matchError) {
+        console.error(matchError);
+        alert("❌ Erro ao excluir o jogo.");
+        return;
+      }
+
       setMatches(matches.filter(m => m.id !== matchId));
+
       if (selectedMatch?.id === matchId) {
         setSelectedMatch(null);
         setStatusMap({});
       }
     } catch (error) {
-      alert("Erro ao excluir o jogo.");
+      console.error(error);
+      alert("❌ Erro ao excluir o jogo.");
     }
   };
 
@@ -75,13 +148,12 @@ export default function MatchesPage({ user }) {
 
   const confirmPlayer = async (playerId, status) => {
     if (!selectedMatch) return;
-    
+
     if (selectedMatch.is_drawn) {
       alert("🔒 Jogo fechado! Não é mais possível alterar presenças.");
       return;
     }
 
-    // Trava de segurança extra no momento do clique
     if (!user?.is_admin && user?.player_id !== playerId) {
       alert("⚠️ Você só pode alterar a sua própria presença.");
       return;
@@ -89,14 +161,22 @@ export default function MatchesPage({ user }) {
 
     setStatusMap(prev => ({ ...prev, [playerId]: status }));
 
-    try {
-      await api.post(`/matches/${selectedMatch.id}/confirm`, {
-        match_id: selectedMatch.id,
-        player_id: playerId,
-        status: status
-      });
-    } catch (err) {
-      alert("Erro ao confirmar presença.");
+    const { error } = await supabase
+      .from("match_player")
+      .upsert(
+        {
+          match_id: selectedMatch.id,
+          player_id: playerId,
+          status: status
+        },
+        {
+          onConflict: "match_id,player_id"
+        }
+      );
+
+    if (error) {
+      console.error("Erro ao confirmar presença:", error);
+      alert(`❌ Erro ao confirmar presença: ${error.message}`);
     }
   };
 

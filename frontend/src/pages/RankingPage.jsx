@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../api.js";
+import { supabase } from "../supabaseClient";
 
 export default function RankingPage() {
   const [ranking, setRanking] = useState([]);
@@ -10,8 +10,51 @@ export default function RankingPage() {
 
   const carregarRanking = async () => {
     try {
-      const res = await api.get("/ranking");
-      setRanking(res.data);
+      const { data: playersData, error: playersError } = await supabase
+        .from("players")
+        .select("*");
+
+      if (playersError) {
+        console.error("Erro ao carregar jogadores:", playersError);
+        return;
+      }
+
+      const { data: matchPlayersData, error: matchPlayersError } = await supabase
+        .from("match_player")
+        .select("*");
+
+      if (matchPlayersError) {
+        console.error("Erro ao carregar estatísticas:", matchPlayersError);
+        return;
+      }
+
+      const rankingCalculado = (playersData || [])
+        .map((player) => {
+          const participacoes = (matchPlayersData || []).filter(
+            (mp) => Number(mp.player_id) === Number(player.id) && mp.team
+          );
+
+          const jogos = participacoes.length;
+          const gols = participacoes.reduce((total, mp) => total + (Number(mp.goals) || 0), 0);
+          const media = jogos > 0 ? (gols / jogos).toFixed(2) : "0.00";
+
+          return {
+            id: player.id,
+            name: player.name,
+            position: player.position,
+            shirt_number: player.shirt_number,
+            jogos,
+            gols,
+            media
+          };
+        })
+        .filter((jogador) => jogador.jogos > 0)
+        .sort((a, b) => {
+          if (b.gols !== a.gols) return b.gols - a.gols;
+          return Number(b.media) - Number(a.media);
+        });
+
+      setRanking(rankingCalculado);
     } catch (error) {
       console.error("Erro ao carregar o ranking", error);
     }

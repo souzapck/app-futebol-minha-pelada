@@ -1,5 +1,15 @@
 import React, { useState } from "react";
-import api from "../api.js";
+import { supabase } from "../supabaseClient";
+
+const normalizePhone = (value) => value.replace(/\D/g, "").slice(0, 11);
+
+const formatPhone = (value) => {
+  const digits = normalizePhone(value);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+};
 
 // O "export default" aqui é obrigatório para o App.jsx conseguir ler este arquivo
 export default function LoginPage({ onLoginSuccess }) {
@@ -10,24 +20,39 @@ export default function LoginPage({ onLoginSuccess }) {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+
+    if (phone.length !== 11) {
+      setErro("❌ Digite um celular com DDD e 11 números.");
+      return;
+    }
+
     setErro("");
     setLoading(true);
 
-    try {
-      const res = await api.post("/login", {
-        phone: phone,
-        password: password
-      });
-      
-      const userData = res.data.user;
-      localStorage.setItem("user", JSON.stringify(userData));
-      onLoginSuccess(userData);
-      
-    } catch (err) {
+    const { data, error } = await supabase
+      .from("users")
+      .select(`
+        *,
+        players (*)
+      `)
+      .eq("phone", phone)
+      .eq("password", password)
+      .single();
+
+    setLoading(false);
+
+    if (error || !data) {
       setErro("❌ Telefone ou senha incorretos.");
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const session = {
+      user: data,
+      expiresAt: Date.now() + (2 * 60 * 60 * 1000) // 2 horas
+    };
+
+    localStorage.setItem("session", JSON.stringify(session));
+    onLoginSuccess(data);
   };
 
   return (
@@ -49,12 +74,13 @@ export default function LoginPage({ onLoginSuccess }) {
           
           <div style={{ textAlign: "left" }}>
             <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Celular (com DDD)</label>
-            <input 
-              type="tel" 
-              placeholder="Ex: 11999998888" 
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+            <input
+              type="tel"
+              placeholder="(48) 98765-4321"
+              value={formatPhone(phone)}
+              onChange={(e) => setPhone(normalizePhone(e.target.value))}
               required
+              maxLength={15}
               style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "16px", boxSizing: "border-box", outline: "none" }}
             />
           </div>
@@ -63,7 +89,7 @@ export default function LoginPage({ onLoginSuccess }) {
             <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Senha (Últimos 4 dígitos)</label>
             <input 
               type="password" 
-              placeholder="Ex: 8888" 
+              placeholder="Ex: 4321" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -74,12 +100,17 @@ export default function LoginPage({ onLoginSuccess }) {
 
           <button 
             type="submit" 
-            disabled={loading}
+            disabled={loading || phone.length !== 11}
             style={{ 
-              background: loading ? "#ccc" : "#28a745", 
-              color: "white", padding: "14px", borderRadius: "8px", border: "none", 
-              fontSize: "16px", fontWeight: "bold", cursor: loading ? "not-allowed" : "pointer", 
-              marginTop: "10px", transition: "0.2s"
+              background: (loading || phone.length !== 11) ? "#ccc" : "#28a745", 
+              color: "white",
+              padding: "14px",
+              borderRadius: "8px",
+              border: "none",
+              fontSize: "16px",
+              fontWeight: "bold",
+              cursor: (loading || phone.length !== 11) ? "not-allowed" : "pointer",
+              marginTop: "10px"
             }}
           >
             {loading ? "Entrando..." : "⚽ Entrar no Vestiário"}

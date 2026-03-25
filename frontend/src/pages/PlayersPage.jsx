@@ -1,5 +1,6 @@
+import { supabase } from "../supabaseClient";
+
 import { useEffect, useState } from "react";
-import api from "../api.js";
 
 
 const POSITIONS = ["GOL", "ZAG", "LAT", "MEI", "ATA"];
@@ -24,16 +25,17 @@ export default function PlayersPage({ user }) {
     const confirma = window.confirm("Deseja dar ou retirar o acesso de Administrador deste jogador?");
     if (!confirma) return;
 
+    const usuario = players.find(p => p.id === jogadorId);
 
-    try {
-      const res = await api.put(`/users/${jogadorId}/admin`);
-      alert(res.data.is_admin ? "✅ Agora este jogador é um Administrador!" : "❌ Este jogador perdeu o acesso de Administrador.");
-     
-      // MUDANÇA AQUI: Recarrega a lista para o ícone de bola virar chave na hora!
+    const { error } = await supabase
+      .from("users")
+      .update({ is_admin: !usuario.users?.is_admin})
+      .eq("player_id", jogadorId);
+
+    if (error) {
+      alert("❌ Erro ao alterar admin");
+    } else {
       loadPlayers();
-     
-    } catch (e) {
-      alert("Erro: O jogador precisa ter um login cadastrado no sistema antes de virar Admin.");
     }
   };
 
@@ -44,14 +46,16 @@ export default function PlayersPage({ user }) {
     if (!novaSenha) return; // Se o admin cancelar, cancela a ação
 
 
-    try {
-      await api.put(`/users/${jogadorId}/password`, { new_password: novaSenha });
-      alert(`✅ A senha de ${nomeJogador} foi alterada para: ${novaSenha}`);
-    } catch (e) {
-      // Pega a mensagem de erro que o Python mandou (ex: "Este jogador não tem telefone...")
-      const erroReal = e.response?.data?.detail || "Erro desconhecido ao alterar senha.";
-      alert(`❌ ${erroReal}`);
-    }
+    const { error } = await supabase
+      .from("users")
+      .update({ password: novaSenha })
+      .eq("player_id", jogadorId);
+
+      if (error) {
+        alert("❌ Erro ao alterar senha");
+      } else {
+        alert(`✅ Senha alterada para: ${novaSenha}`);
+      }
   };
 
 
@@ -63,10 +67,20 @@ export default function PlayersPage({ user }) {
 
   const loadPlayers = async () => {
     try {
-      const res = await api.get("/players");
-      setPlayers(res.data);
+      const { data, error } = await supabase
+        .from("players")
+        .select(`
+          *,
+          users (is_admin)
+        `);
+
+      if (error) {
+        console.error("Erro ao carregar jogadores:", error);
+      } else {
+        setPlayers(data);
+      }
     } catch (err) {
-      console.error("Erro ao carregar jogadores");
+      console.error("Erro geral:", err);
     }
   };
 
@@ -74,13 +88,24 @@ export default function PlayersPage({ user }) {
   // --- Função para CRIAR Novo Jogador ---
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+
     const payload = {
       ...newForm,
-      shirt_number: newForm.shirt_number ? parseInt(newForm.shirt_number) : null
+      shirt_number: newForm.shirt_number
+        ? parseInt(newForm.shirt_number)
+        : null
     };
 
+    const { error } = await supabase
+      .from("players")
+      .insert([payload]);
 
-    await api.post("/players", payload);
+    if (error) {
+      console.error("Erro ao criar jogador:", error);
+      alert("❌ Erro ao criar jogador");
+      return;
+    }
+
     setNewForm(INITIAL_FORM);
     setShowNewForm(false);
     loadPlayers();
@@ -108,16 +133,28 @@ export default function PlayersPage({ user }) {
 
   const handleEditSubmit = async (e, playerId) => {
     e.preventDefault();
+
     const payload = {
       ...editForm,
-      shirt_number: editForm.shirt_number ? parseInt(editForm.shirt_number) : null
+      shirt_number: editForm.shirt_number
+        ? parseInt(editForm.shirt_number)
+        : null
     };
 
+  const { error } = await supabase
+    .from("players")
+    .update(payload)
+    .eq("id", playerId);
 
-    await api.put(`/players/${playerId}`, payload);
+    if (error) {
+      console.error("Erro ao editar jogador:", error);
+      alert("❌ Erro ao editar jogador");
+      return;
+    }
+
     setEditingId(null);
     loadPlayers();
-  };
+};
 
 
   // --- REGRAS DE ORDENAÇÃO DA LISTA DE JOGADORES ---
@@ -128,15 +165,13 @@ export default function PlayersPage({ user }) {
 
 
     // Regra 2: Os Administradores (🔑) vêm logo em seguida
-    if (a.is_admin && !b.is_admin) return -1;
-    if (!a.is_admin && b.is_admin) return 1;
+    if (a.users?.is_admin && !b.is_admin) return -1;
+    if (!a.users?.is_admin && b.is_admin) return 1;
 
 
     // Regra 3: O resto da lista fica em Ordem Alfabética
     return a.name.localeCompare(b.name);
   });
-
-
 
 
   return (
@@ -156,17 +191,17 @@ export default function PlayersPage({ user }) {
           <h3 style={{ marginTop: 0, color: "#007bff" }}>👥 Novo Jogador</h3>
           <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             <div style={{ display: "flex", gap: "200px" }}> 
-              <spam style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</spam>
-              <spam style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</spam>
+              <span style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</span>
+              <span style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</span>
             </div>
             <div style={{ display: "flex", gap: "10px" }}>                                              
               <input style={{ flex: 1 }} placeholder="Nome *" required value={newForm.name} onChange={e => setNewForm({...newForm, name: e.target.value})} />
               <input  placeholder="WhatsApp" type="tel" value={newForm.phone} onChange={e => setNewForm({...newForm, phone: e.target.value})} />      
             </div>            
             <div style={{ display: "flex", gap: "35px" }}>
-              <spam style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</spam>
-              <spam style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</spam>              
-              <spam style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</spam>
+              <span style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</span>
+              <span style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</span>              
+              <span style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</span>
             </div>
             <div style={{ display: "flex", gap: "50px" }}>
               <select style={{ flex: 2}}  value={newForm.position} onChange={e => setNewForm({...newForm, position: e.target.value})}>
@@ -204,7 +239,7 @@ export default function PlayersPage({ user }) {
                 <div>
                   <div style={{ fontWeight: "bold", fontSize: "16px", color: "#333" }}>
                     {p.shirt_number ? <span style={{ color: "#007bff", marginRight: "5px" }}>#{p.shirt_number}</span> : ""}
-                    {p.name} <span style={{ fontSize: "14px", marginLeft: "4px" }}>{p.is_admin ? "🔑" : "⚽"}</span>                    
+                    {p.name} <span style={{ fontSize: "14px", marginLeft: "4px" }}>{p.users?.is_admin ? "🔑" : "⚽"}</span>                    
                   </div>
 
 
@@ -229,7 +264,7 @@ export default function PlayersPage({ user }) {
                         boxShadow: p.id !== user.player_id ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
                     }}
                   >
-                    {p.id === user.player_id ? "🔒 Você" : p.is_admin ? "🔑 Tirar Admin" : "⚽ Dar Admin"}
+                    {p.id === user.player_id ? "🔒 Você" : p.users?.is_admin ? "🔑 Tirar Admin" : "⚽ Dar Admin"}
                   </button>                
                  
                   {/* NOVO: BOTÃO DE RESETAR SENHA */}

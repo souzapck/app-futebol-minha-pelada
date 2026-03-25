@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
-import api from "../api.js";
+import { supabase } from "../supabaseClient";
 
 export default function TeamsPage({ user }) {
+
   const [matches, setMatches] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
-  
   const [players, setPlayers] = useState([]);
   const [teamA, setTeamA] = useState([]);
   const [teamB, setTeamB] = useState([]);
-  
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [goals, setGoals] = useState({});
@@ -18,14 +17,64 @@ export default function TeamsPage({ user }) {
   }, []);
 
   const loadMatches = async () => {
-    const res = await api.get("/matches");
-    setMatches(res.data);
+    const { data, error } = await supabase
+      .from("matches")
+      .select("*")
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error("Erro ao carregar partidas:", error);
+      return;
+    }
+
+    setMatches(data || []);
   };
 
   const loadMatchData = async (match) => {
     setSelectedMatch(match);
-    const resP = await api.get(`/matches/${match.id}/players`);
-    const confirmados = resP.data.filter(p => p.status && String(p.status).trim().toLowerCase() === "confirmado");
+
+    const { data: matchPlayersData, error: mpError } = await supabase
+      .from("match_player")
+      .select("*")
+      .eq("match_id", match.id);
+
+    if (mpError) {
+      console.error("Erro ao carregar match_player:", mpError);
+      return;
+    }
+
+    const { data: playersData, error: playersError } = await supabase
+      .from("players")
+      .select("*");
+
+    if (playersError) {
+      console.error("Erro ao carregar players:", playersError);
+      return;
+    }
+
+    const confirmados = (matchPlayersData || [])
+      .filter(item => String(item.status || "").trim().toLowerCase() === "confirmado")
+      .map(item => {
+        const player = (playersData || []).find(
+          p => Number(p.id) === Number(item.player_id)
+        );
+
+        if (!player) return null;
+
+        return {
+          id: player.id,
+          name: player.name,
+          position: player.position,
+          rating: player.rating,
+          shirt_number: player.shirt_number,
+          phone: player.phone,
+          status: item.status,
+          team: item.team,
+          goals: item.goals || 0
+        };
+      })
+      .filter(Boolean);
+
     setPlayers(confirmados);
 
     if (match.is_drawn) {
@@ -33,13 +82,18 @@ export default function TeamsPage({ user }) {
       setTeamB(confirmados.filter(p => p.team === "B"));
       setScoreA(match.score_a || 0);
       setScoreB(match.score_b || 0);
-      
+
       const goalsMap = {};
-      confirmados.forEach(p => { goalsMap[p.id] = p.goals || 0 });
+      confirmados.forEach(p => {
+        goalsMap[p.id] = p.goals || 0;
+      });
       setGoals(goalsMap);
     } else {
-      setTeamA([]); 
+      setTeamA([]);
       setTeamB([]);
+      setScoreA(0);
+      setScoreB(0);
+      setGoals({});
     }
   };
 
@@ -111,46 +165,162 @@ export default function TeamsPage({ user }) {
   };
 
 
-
   const confirmarSorteio = async () => {
     if (teamA.length === 0 || teamB.length === 0) return;
-    const confirm = window.confirm("🔒 Deseja travar o jogo? \nNinguém mais poderá alterar presença após isso.\n");
+
+    const confirm = window.confirm(
+      "🔒 Deseja travar o jogo? \nNinguém mais poderá alterar presença após isso.\n"
+    );
     if (!confirm) return;
 
-    await api.post(`/matches/${selectedMatch.id}/draw`, {
-      team_a: teamA.map(p => p.id),
-      team_b: teamB.map(p => p.id)
-    });
-    
-    alert("Sorteio Confirmado e Jogo Travado!");
-    loadMatches();
-    loadMatchData({ ...selectedMatch, is_drawn: true });
+    try {
+      // salva os times no match_player
+      const updatesA = teamA.map((p) =>
+        supabase
+          .from("match_player")
+          .update({ team: "A" })
+          .eq("match_id", selectedMatch.id)
+          .eq("player_id", p.id)
+      );
+
+      const updatesB = teamB.map((p) =>
+        supabase
+          .from("match_player")
+          .update({ team: "B" })
+          .eq("match_id", selectedMatch.id)
+          .eq("player_id", p.id)
+      );
+
+      const results = await Promise.all([...updatesA, ...updatesB]);
+
+      const teamError = results.find((r) => r.error);
+      if (teamError) {
+        console.error(teamError.error);
+        alert("❌ Erro ao salvar os times.");
+        return;
+      }
+
+      // trava a partida
+      const { error: matchError } = await supabase
+        .from("matches")
+        .update({ is_drawn: true })
+        .eq("id", selectedMatch.id);
+
+      if (matchError) {
+        console.error(matchError);
+        alert("❌ Erro ao travar o jogo.");
+        return;
+      }
+
+      alert("✅ Sorteio confirmado e jogo travado!");
+      await loadMatches();
+      await loadMatchData({ ...selectedMatch, is_drawn: true });
+    } catch (error) {
+      console.error(error);
+      alert("❌ Erro ao confirmar o sorteio.");
+    }
   };
+
 
   const desfazerSorteio = async () => {
-    const confirm = window.confirm("⚠️ Deseja REABRIR esta partida? Isso apagará os placares e times gravados.");
+    const confirm = window.confirm(
+      "⚠️ Deseja REABRIR esta partida? Isso apagará os placares e times gravados."
+    );
     if (!confirm) return;
 
-    await api.post(`/matches/${selectedMatch.id}/draw`, {
-      team_a: [], team_b: [], reset: true
-    });
-    
-    alert("Jogo reaberto!");
-    loadMatches();
-    loadMatchData({ ...selectedMatch, is_drawn: false, score_a: 0, score_b: 0 });
+    try {
+      // limpa times e gols dos jogadores
+      const { error: mpError } = await supabase
+        .from("match_player")
+        .update({ team: null, goals: 0 })
+        .eq("match_id", selectedMatch.id);
+
+      if (mpError) {
+        console.error(mpError);
+        alert("❌ Erro ao limpar os dados da partida.");
+        return;
+      }
+
+      // reabre a partida e zera placar
+      const { error: matchError } = await supabase
+        .from("matches")
+        .update({
+          is_drawn: false,
+          score_a: 0,
+          score_b: 0
+        })
+        .eq("id", selectedMatch.id);
+
+      if (matchError) {
+        console.error(matchError);
+        alert("❌ Erro ao reabrir o jogo.");
+        return;
+      }
+
+      alert("✅ Jogo reaberto!");
+      await loadMatches();
+      await loadMatchData({
+        ...selectedMatch,
+        is_drawn: false,
+        score_a: 0,
+        score_b: 0
+      });
+    } catch (error) {
+      console.error(error);
+      alert("❌ Erro ao desfazer o sorteio.");
+    }
   };
+
 
   const handleGoalChange = (playerId, amount) => {
     setGoals(prev => ({ ...prev, [playerId]: Math.max(0, parseInt(amount) || 0) }));
   };
 
   const salvarEstatisticas = async () => {
-    await api.post(`/matches/${selectedMatch.id}/stats`, {
-      score_a: scoreA,
-      score_b: scoreB,
-      goals: goals
-    });
-    alert("✅ Estatísticas do jogo salvas com sucesso!");
+    try {
+      // salva placar da partida
+      const { error: matchError } = await supabase
+        .from("matches")
+        .update({
+          score_a: Number(scoreA),
+          score_b: Number(scoreB)
+        })
+        .eq("id", selectedMatch.id);
+
+      if (matchError) {
+        console.error(matchError);
+        alert("❌ Erro ao salvar o placar.");
+        return;
+      }
+
+      // salva gols por jogador
+      const goalUpdates = Object.entries(goals).map(([playerId, goalCount]) =>
+        supabase
+          .from("match_player")
+          .update({ goals: Number(goalCount) || 0 })
+          .eq("match_id", selectedMatch.id)
+          .eq("player_id", Number(playerId))
+      );
+
+      const results = await Promise.all(goalUpdates);
+      const goalError = results.find((r) => r.error);
+
+      if (goalError) {
+        console.error(goalError.error);
+        alert("❌ Erro ao salvar os gols.");
+        return;
+      }
+
+      alert("✅ Estatísticas do jogo salvas com sucesso!");
+      await loadMatchData({
+        ...selectedMatch,
+        score_a: Number(scoreA),
+        score_b: Number(scoreB)
+      });
+    } catch (error) {
+      console.error(error);
+      alert("❌ Erro ao salvar estatísticas.");
+    }
   };
 
   const calcForca = (time) => time.reduce((soma, p) => soma + p.rating, 0).toFixed(1);

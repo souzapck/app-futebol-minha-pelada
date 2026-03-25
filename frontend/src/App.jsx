@@ -5,38 +5,95 @@ import TeamsPage from "./pages/TeamsPage.jsx";
 import RankingPage from "./pages/RankingPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import "./App.css";
-import api from "./api.js";
+
+
+import { supabase } from "./supabaseClient";
 
 
 function App() {
-  const [view, setView] = useState("matches"); 
-  const [user, setUser] = useState(null); 
+
+    const [view, setView] = useState("matches"); 
+    const [user, setUser] = useState(null); 
+
+    const SESSION_DURATION = 2 * 60 * 60 * 1000; // 2 horas
+    const IDLE_LIMIT = 15 * 60 * 1000; // 15 minutos
+
+    const renovarSessao = () => {
+      const session = localStorage.getItem("session");
+      if (!session) return;
+
+      const parsed = JSON.parse(session);
+
+      const novaSession = {
+        ...parsed,
+        expiresAt: Date.now() + SESSION_DURATION,
+        lastActivityAt: Date.now()
+      };
+
+      localStorage.setItem("session", JSON.stringify(novaSession));
+    };
+
+    // ✅ 1. Verifica sessão ao abrir
+    useEffect(() => {
+      const session = localStorage.getItem("session");
+
+      if (session) {
+        const parsed = JSON.parse(session);
+
+        if (Date.now() > parsed.expiresAt) {
+          localStorage.removeItem("session");
+          setUser(null);
+        } else {
+          setUser(parsed.user);
+        }
+      }
+    }, []);
+
+    // ✅ 2. Verifica sessão em tempo real
+    useEffect(() => {
+      const interval = setInterval(() => {
+        const session = localStorage.getItem("session");
+
+        if (session) {
+          const parsed = JSON.parse(session);
+
+          if (Date.now() > parsed.expiresAt) {
+            alert("⏱️ Sessão expirada. Faça login novamente.");
+            localStorage.removeItem("session");
+            setUser(null);
+          }
+        }
+      }, 60000);
+
+      return () => clearInterval(interval);
+    }, []);
+
 
   const mudarSenha = async () => {
     const novaSenha = window.prompt("🔑 Digite a sua nova senha:");
     if (!novaSenha) return;
-    
+
+    if (novaSenha.length !== 4) {
+      alert("❌ A senha deve ter exatamente 4 dígitos.");
+      return;
+    }
+
     try {
-      await api.put(`/users/${user.player_id}/password`, { new_password: novaSenha });
+      const { error } = await supabase
+        .from("users")
+        .update({ password: novaSenha })
+        .eq("player_id", user.player_id);
+
+      if (error) throw error;
+
       alert("✅ Senha alterada com sucesso!");
     } catch (e) {
-      // 🚨 MUDANÇA AQUI: Agora ele vai mostrar o erro exato que o servidor deu!
-      const erroReal = e.response?.data?.detail || e.message;
-      alert(`❌ Erro do Servidor: ${erroReal}`);
+      alert(`❌ Erro: ${e.message}`);
     }
   };
 
-
-
-  useEffect(() => {
-    const loggedUser = localStorage.getItem("user");
-    if (loggedUser) {
-      setUser(JSON.parse(loggedUser));
-    }
-  }, []);
-
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    localStorage.removeItem("session");
     setUser(null);
   };
 
@@ -58,10 +115,10 @@ function App() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "#fff", padding: "10px 15px", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{ background: "#007bff", color: "white", width: "35px", height: "35px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "18px" }}>
-            {user.name.charAt(0)}
+            {user?.players?.name?.charAt(0)}
           </div>
           <div>
-            <div style={{ fontWeight: "bold", color: "#333" }}>{user.name}</div>
+            <div style={{ fontWeight: "bold", color: "#333" }}>{user?.players?.name}</div>
             <div style={{ fontSize: "12px", color: user.is_admin ? "#dc3545" : "#888", fontWeight: user.is_admin ? "bold" : "normal" }}>
               {user.is_admin ? "🔑 Administrador" : "⚽ Jogador"}
             </div>
