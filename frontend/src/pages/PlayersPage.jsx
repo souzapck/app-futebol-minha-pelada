@@ -590,7 +590,7 @@ export default function PlayersPage({ user }) {
                         <span style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</span>              
                         <span style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</span>
                       </div>
-                      <div style={{ display: "flex", gap: "50px" }}>
+                      <div style={{ display: "flex", gap: "35px" }}>
                         <select style={{ flex: 2}}  value={editForm.position} onChange={e => setEditForm({...editForm, position: e.target.value})}>
                           {POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                         </select> 
