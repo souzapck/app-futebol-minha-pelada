@@ -297,7 +297,7 @@ export default function MatchesPage({ user }) {
                     </div>
 
                     <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>
-                      ⚽ {p.position} | ⭐ {p.rating}
+                      ⚽ {p.position} | ⭐ ? {/*{p.rating}*/}
                     </div>
                   </div>
 
