@@ -7,6 +7,7 @@ export default function MatchesPage({ user }) {
   const [players, setPlayers] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [statusMap, setStatusMap] = useState({});
+  const [shirtMap, setShirtMap] = useState({});
 
   useEffect(() => {
     loadData();
@@ -50,12 +51,65 @@ export default function MatchesPage({ user }) {
     }
 
     const novoStatusMap = {};
+    const novoShirtMap = {};
+
+    // primeiro: carregar do match_player
     (data || []).forEach(item => {
       novoStatusMap[item.player_id] = item.status;
+      novoShirtMap[item.player_id] = item.shirt_number ?? "";
+    });
+
+    // depois: preencher com número fixo se não tiver
+    players.forEach(p => {
+      if (p.shirt_number && !novoShirtMap[p.id]) {
+        novoShirtMap[p.id] = p.shirt_number;
+      }
     });
 
     setStatusMap(novoStatusMap);
+    setShirtMap(novoShirtMap);
   };
+
+
+  const updateShirtNumber = async (playerId, value) => {
+    if (!selectedMatch) return;
+
+    const player = players.find(p => p.id === playerId);
+
+    // 🚫 bloqueia alteração se tem número fixo
+    if (player?.shirt_number) return;
+
+    const numberValue = value === "" ? null : Number(value);
+
+    if (numberValue !== null && (Number.isNaN(numberValue) || numberValue < 0 || numberValue > 99)) {
+      return;
+    }
+
+    setShirtMap(prev => ({
+      ...prev,
+      [playerId]: value
+    }));
+
+    const { error } = await supabase
+      .from("match_player")
+      .upsert(
+        {
+          match_id: selectedMatch.id,
+          player_id: playerId,
+          status: statusMap[playerId] || "sem_resposta",
+          shirt_number: numberValue
+        },
+        {
+          onConflict: "match_id,player_id"
+        }
+      );
+
+    if (error) {
+      console.error("Erro ao salvar número da camisa:", error);
+      alert("❌ Erro ao salvar número da camisa.");
+    }
+  };
+
 
   const getNextThursday = () => {
     const d = new Date();
@@ -140,6 +194,7 @@ export default function MatchesPage({ user }) {
       if (selectedMatch?.id === matchId) {
         setSelectedMatch(null);
         setStatusMap({});
+        setShirtMap({});
       }
     } catch (error) {
       console.error(error);
@@ -167,13 +222,19 @@ export default function MatchesPage({ user }) {
 
     setStatusMap(prev => ({ ...prev, [playerId]: status }));
 
+    const shirtNumberValue =
+      shirtMap[playerId] === "" || shirtMap[playerId] === undefined
+        ? null
+        : Number(shirtMap[playerId]);
+
     const { error } = await supabase
       .from("match_player")
       .upsert(
         {
           match_id: selectedMatch.id,
           player_id: playerId,
-          status: status
+          status: status,
+          shirt_number: shirtNumberValue
         },
         {
           onConflict: "match_id,player_id"
@@ -271,6 +332,7 @@ export default function MatchesPage({ user }) {
               
               // Lógica central: O jogador não é admin e a linha que está sendo desenhada não é a dele.
               const bloqueadoParaEsteUsuario = !user?.is_admin && user?.player_id !== p.id;
+              const hasFixedNumber = !!p.shirt_number;
               
               return (
                 <div key={p.id} style={{ 
@@ -282,22 +344,62 @@ export default function MatchesPage({ user }) {
                 }}>
                   
                   <div>
-                    <div style={{ fontWeight: "bold", fontSize: "16px", color: "#333", display: "flex", alignItems: "center" }}>
-                      <span style={{ color: "#007bff", marginRight: "5px" }}>
-                        {(p.shirt_number !== null && p.shirt_number !== undefined && p.shirt_number !== "") ? String(p.shirt_number).padStart(2, '0') : "--"}
-                      </span>
+                    <div style={{ textAlign: "left",fontWeight: "bold", fontSize: "16px", color: "#333" }}>
                       {p.name}
-                      
-                      {/* ETIQUETA "VOCÊ" SE FOR O JOGADOR LOGADO */}
+
                       {user?.player_id === p.id && (
-                        <span style={{ fontSize: "11px", color: "#28a745", background: "#e8f5e9", padding: "2px 6px", borderRadius: "10px", marginLeft: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        <span style={{
+                          fontSize: "11px",
+                          color: "#28a745",
+                          background: "#e8f5e9",
+                          padding: "2px 6px",
+                          borderRadius: "10px",
+                          marginLeft: "8px",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px"
+                        }}>
                           Você
                         </span>
                       )}
                     </div>
 
-                    <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>
-                      ⚽ {p.position} | ⭐ ? {/*{p.rating}*/}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginTop: "6px",
+                      flexWrap: "wrap"
+                    }}>
+                      <span>👕</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="99"
+                        value={shirtMap[p.id] ?? ""}
+                        onChange={(e) => updateShirtNumber(p.id, e.target.value)}
+                        disabled={
+                          selectedMatch.is_drawn ||
+                          bloqueadoParaEsteUsuario ||
+                          hasFixedNumber
+                        }
+                        style={{
+                          width: "48px",
+                          padding: "4px",
+                          textAlign: "center",
+                          borderRadius: "6px",
+                          border: "1px solid #ccc",
+                          color: hasFixedNumber ? "#666" : "#007bff",
+                          fontWeight: "bold",
+                          fontSize: "13px",
+                          backgroundColor: hasFixedNumber ? "#e9ecef" : "#fff"
+                        }}
+                        title={hasFixedNumber ? "Número fixo" : "Número da camisa"}
+                      />
+
+                      <span style={{ fontSize: "12px", color: "#888" }}>
+                        ⚽ {p.position} | ⭐ ?{/*{p.rating}*/}
+                      </span>
+
                     </div>
                   </div>
 

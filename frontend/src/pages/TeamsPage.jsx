@@ -67,7 +67,7 @@ export default function TeamsPage({ user }) {
           name: player.name,
           position: player.position,
           rating: player.rating,
-          shirt_number: player.shirt_number,
+          shirt_number: item.shirt_number ?? null,
           phone: player.phone,
           status: item.status,
           team: item.team,
