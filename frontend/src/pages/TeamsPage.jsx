@@ -45,7 +45,8 @@ export default function TeamsPage({ user }) {
 
     const { data: playersData, error: playersError } = await supabase
       .from("players")
-      .select("*");
+      .select("*")
+      .eq("is_hidden", false);
 
     if (playersError) {
       console.error("Erro ao carregar players:", playersError);
@@ -99,68 +100,145 @@ export default function TeamsPage({ user }) {
 
 
   const sortearTimes = () => {
-    if (players.length === 0) return alert("Não há jogadores confirmados!");
-    
-    const jogadoresPorPosicao = { GOL: [], ZAG: [], LAT: [], MEI: [], ATA: [] };
+    if (players.length < 2) {
+      alert("Não há jogadores suficientes para sortear os times!");
+      return;
+    }
 
-    // EMBARALHAR OS JOGADORES PRIMEIRO (Para garantir resultados diferentes)
-    // Usamos um truque simples do JavaScript (Math.random() - 0.5) para misturar a lista original
-    const playersEmbaralhados = [...players].sort(() => Math.random() - 0.5);
+    const embaralhar = (lista) => [...lista].sort(() => Math.random() - 0.5);
 
-    playersEmbaralhados.forEach(p => {
-      const pos = jogadoresPorPosicao[p.position] ? p.position : "MEI";
-      jogadoresPorPosicao[pos].push(p);
+    const porPosicao = {
+      GOL: [],
+      ZAG: [],
+      LAT: [],
+      MEI: [],
+      ATA: []
+    };
+
+    players.forEach((p) => {
+      const pos = porPosicao[p.position] ? p.position : "MEI";
+      porPosicao[pos].push(p);
     });
 
-    // Agora ordena do melhor para o pior, mas como eles foram embaralhados antes,
-    // jogadores com a MESMA NOTA vão cair em ordens diferentes a cada clique!
-    Object.keys(jogadoresPorPosicao).forEach(pos => {
-      jogadoresPorPosicao[pos].sort((a, b) => b.rating - a.rating);
+    Object.keys(porPosicao).forEach((pos) => {
+      porPosicao[pos] = embaralhar(porPosicao[pos]).sort((a, b) => b.rating - a.rating);
     });
 
-    const tA = []; 
-    const tB = [];
-    let forçaA = 0; 
-    let forçaB = 0;
-    
-    // Sortear de forma aleatória qual time começa escolhendo o primeiro jogador
-    // Isso também ajuda a mudar os times a cada clique!
-    const timeA_Comeca = Math.random() > 0.5;
+    let tA = [];
+    let tB = [];
+    let forcaA = 0;
+    let forcaB = 0;
 
-    const ordemSorteio = ["GOL", "ZAG", "LAT", "MEI", "ATA"];
+    const addToTeam = (player, team) => {
+      if (team === "A") {
+        tA.push(player);
+        forcaA += Number(player.rating) || 0;
+      } else {
+        tB.push(player);
+        forcaB += Number(player.rating) || 0;
+      }
+    };
 
-    ordemSorteio.forEach(posicao => {
-      const jogadores = jogadoresPorPosicao[posicao] || [];
-      
-      jogadores.forEach((p, index) => {
-        // REGRA 1: Sempre mandar para o time que tem MENOS jogadores
-        if (tA.length < tB.length) {
-          tA.push(p);
-          forçaA += p.rating;
-        } 
-        else if (tB.length < tA.length) {
-          tB.push(p);
-          forçaB += p.rating;
-        } 
-        // REGRA 2: Se têm a mesma quantidade, decide por quem está mais fraco, ou por sorteio se estiverem iguais
-        else {
-          if (forçaA < forçaB) {
-            tA.push(p); forçaA += p.rating;
-          } else if (forçaB < forçaA) {
-            tB.push(p); forçaB += p.rating;
-          } else {
-            // Se as forças estiverem iguais, usa o sorteio inicial para decidir quem leva
-            if (timeA_Comeca) {
-              tA.push(p); forçaA += p.rating;
-            } else {
-              tB.push(p); forçaB += p.rating;
-            }
-          }
-        }
+    const weakerTeam = () => {
+      if (tA.length < tB.length) return "A";
+      if (tB.length < tA.length) return "B";
+      return forcaA <= forcaB ? "A" : "B";
+    };
+
+    const strongerTeam = () => {
+      if (tA.length > tB.length) return "A";
+      if (tB.length > tA.length) return "B";
+      return forcaA > forcaB ? "A" : "B";
+    };
+
+    const distribuirBasePorPosicao = (pos) => {
+      const lista = [...porPosicao[pos]];
+      if (lista.length === 0) return;
+
+      // Se houver pelo menos 2, tenta garantir 1 em cada time
+      if (lista.length >= 2) {
+        const primeiro = lista.shift();
+        const segundo = lista.shift();
+
+        // melhor vai para o time mais fraco, segundo para o outro
+        const timePrimeiro = weakerTeam();
+        const timeSegundo = timePrimeiro === "A" ? "B" : "A";
+
+        addToTeam(primeiro, timePrimeiro);
+        addToTeam(segundo, timeSegundo);
+      } else {
+        // só existe 1 jogador da posição
+        addToTeam(lista.shift(), weakerTeam());
+      }
+
+      porPosicao[pos] = lista;
+    };
+
+    // 1) Garantir base por linha, deixando GOL por último
+    ["ZAG", "LAT", "MEI", "ATA"].forEach(distribuirBasePorPosicao);
+
+    // 2) Distribuir jogadores restantes dessas posições equilibrando força
+    ["ZAG", "LAT", "MEI", "ATA"].forEach((pos) => {
+      porPosicao[pos].forEach((player) => {
+        addToTeam(player, weakerTeam());
       });
+      porPosicao[pos] = [];
     });
 
-    setTeamA(tA); 
+    // 3) Distribuir goleiros por último para ajuste fino
+    if (porPosicao.GOL.length > 0) {
+      const goleiros = [...porPosicao.GOL].sort((a, b) => b.rating - a.rating);
+
+      if (goleiros.length >= 2) {
+        const g1 = goleiros.shift();
+        const g2 = goleiros.shift();
+
+        // melhor goleiro vai para o time mais fraco
+        const timeG1 = weakerTeam();
+        const timeG2 = timeG1 === "A" ? "B" : "A";
+
+        addToTeam(g1, timeG1);
+        addToTeam(g2, timeG2);
+      }
+
+      goleiros.forEach((g) => {
+        addToTeam(g, weakerTeam());
+      });
+    }
+
+    // 4) Ajuste fino: se diferença de força ficar grande, tenta trocar 1 jogador de linha
+    const diferenca = Math.abs(forcaA - forcaB);
+
+    if (diferenca > 1.5) {
+      const semGoleiroA = tA.filter((p) => p.position !== "GOL");
+      const semGoleiroB = tB.filter((p) => p.position !== "GOL");
+
+      let melhorTroca = null;
+      let melhorDiferenca = diferenca;
+
+      semGoleiroA.forEach((a) => {
+        semGoleiroB.forEach((b) => {
+          // troca preferencialmente mesma posição
+          if (a.position !== b.position) return;
+
+          const novoA = forcaA - a.rating + b.rating;
+          const novoB = forcaB - b.rating + a.rating;
+          const novaDif = Math.abs(novoA - novoB);
+
+          if (novaDif < melhorDiferenca) {
+            melhorDiferenca = novaDif;
+            melhorTroca = { a, b };
+          }
+        });
+      });
+
+      if (melhorTroca) {
+        tA = tA.map((p) => (p.id === melhorTroca.a.id ? melhorTroca.b : p));
+        tB = tB.map((p) => (p.id === melhorTroca.b.id ? melhorTroca.a : p));
+      }
+    }
+
+    setTeamA(tA);
     setTeamB(tB);
   };
 

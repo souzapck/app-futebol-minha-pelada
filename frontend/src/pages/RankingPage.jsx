@@ -12,7 +12,8 @@ export default function RankingPage() {
     try {
       const { data: playersData, error: playersError } = await supabase
         .from("players")
-        .select("*");
+        .select("*")
+        .eq("is_hidden", false);
 
       if (playersError) {
         console.error("Erro ao carregar jogadores:", playersError);

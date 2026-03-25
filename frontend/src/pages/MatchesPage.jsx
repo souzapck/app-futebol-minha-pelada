@@ -26,6 +26,7 @@ export default function MatchesPage({ user }) {
     const { data: playersData, error: playersError } = await supabase
       .from("players")
       .select("*")
+      .eq("is_hidden", false)
       .order("name", { ascending: true });
 
     if (playersError) {
@@ -99,6 +100,11 @@ export default function MatchesPage({ user }) {
   };
 
   const deleteMatch = async (matchId) => {
+    if (selectedMatch?.is_drawn) {
+      alert("❌ Partidas travadas não podem ser excluídas.");
+      return;
+    }
+
     const confirmDelete = window.confirm(
       "🗑️ Tem certeza que deseja excluir este jogo? Todos os dados serão apagados."
     );
@@ -235,24 +241,24 @@ export default function MatchesPage({ user }) {
       {selectedMatch && (
         <div style={{ background: "#f8f9fa", borderRadius: "12px", padding: "15px", border: "1px solid #eee" }}>
           
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexWrap: "wrap", gap: "8px"}}>
             <h3 style={{ margin: 0, color: "#333" }}>Presença</h3>
             
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
               <div style={{ 
                 background: totalConfirmed >= 12 ? "#28a745" : totalConfirmed >= 10 ? "#ffc107" : "#dc3545", 
                 color: totalConfirmed >= 10 && totalConfirmed < 12 ? "black" : "white", 
-                padding: "6px 12px", borderRadius: "20px", fontWeight: "bold", fontSize: "14px",
+                padding: "4px 10px", borderRadius: "20px", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap",
                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
               }}>
                 Confirmados: {totalConfirmed}
               </div>
               
               {/* SÓ MOSTRA O BOTÃO DE EXCLUIR JOGO SE FOR ADMIN */}
-              {user?.is_admin && (
+              {user?.is_admin &&  !selectedMatch?.is_drawn &&(
                 <button 
                   onClick={() => deleteMatch(selectedMatch.id)}
-                  style={{ background: "#dc3545", color: "white", border: "none", borderRadius: "8px", padding: "6px 10px", cursor: "pointer", fontWeight: "bold", fontSize: "14px" }}
+                  style={{ background: "#dc3545", color: "white", border: "none", borderRadius: "8px", padding: "5px 8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap", }}
                 >
                   🗑️ Excluir
                 </button>

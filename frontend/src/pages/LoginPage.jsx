@@ -29,30 +29,38 @@ export default function LoginPage({ onLoginSuccess }) {
     setErro("");
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("users")
-      .select(`
-        *,
-        players (*)
-      `)
-      .eq("phone", phone)
-      .eq("password", password)
-      .single();
+    const { data, error } = await supabase.rpc("login_user", {
+      p_phone: phone,
+      p_password: password
+    });
 
     setLoading(false);
 
-    if (error || !data) {
+    if (error || !data || data.length === 0) {
       setErro("❌ Telefone ou senha incorretos.");
       return;
     }
 
+    const userData = {
+      id: data[0].id,
+      phone: data[0].phone,
+      is_admin: Boolean(data[0].is_admin),
+      player_id: data[0].player_id,
+      players: {
+        name: data[0].player_name,
+        position: data[0].player_position,
+        shirt_number: data[0].player_shirt_number
+      }
+    };
+
     const session = {
-      user: data,
-      expiresAt: Date.now() + (2 * 60 * 60 * 1000) // 2 horas
+      user: userData,
+      expiresAt: Date.now() + (2 * 60 * 60 * 1000),
+      lastActivityAt: Date.now()
     };
 
     localStorage.setItem("session", JSON.stringify(session));
-    onLoginSuccess(data);
+    onLoginSuccess(userData);
   };
 
   return (
