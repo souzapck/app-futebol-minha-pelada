@@ -543,7 +543,7 @@ export default function BallVotePage({ user }) {
                                 opacity: isSelf || voteLocked ? 0.6 : 1
                               }}
                             >
-                              ⚽ Bola cheia
+                              ⚽ Cheia
                             </button>
 
                             <button
@@ -561,7 +561,7 @@ export default function BallVotePage({ user }) {
                                 opacity: isSelf || voteLocked ? 0.6 : 1
                               }}
                             >
-                              🎈 Bola murcha
+                              🎈 Murcha
                             </button>
                           </div>
                         </div>
