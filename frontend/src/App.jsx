@@ -196,7 +196,7 @@ function App() {
       {view === "matches" && <MatchesPage user={user} />}
       {view === "teams" && <TeamsPage user={user} />}
       {view === "ranking" && <RankingPage />}
-      {view === "voting" && <VotingPage />}
+      {view === "voting" && <VotingPage user={user} />}
 
     </div>
   );
