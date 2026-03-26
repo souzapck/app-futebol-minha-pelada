@@ -4,6 +4,7 @@ import MatchesPage from "./pages/MatchesPage.jsx";
 import TeamsPage from "./pages/TeamsPage.jsx";
 import RankingPage from "./pages/RankingPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import VotingPage from "./pages/VotingPage.jsx";
 import "./App.css";
 
 
@@ -173,6 +174,21 @@ function App() {
         >
           🏆 Ranking
         </button>
+        <button 
+          onClick={() => setView("voting")} 
+          style={{ 
+            padding: "10px 20px",
+            borderRadius: "20px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold",
+            background: view === "voting" ? "#28a745" : "#eee",
+            color: view === "voting" ? "white" : "#333"
+          }}
+        >
+          🗳️ Votação
+        </button>
+
       </nav>
 
       {/* Agora passamos o "user={user}" para todas as páginas saberem quem está logado! */}
@@ -180,6 +196,7 @@ function App() {
       {view === "matches" && <MatchesPage user={user} />}
       {view === "teams" && <TeamsPage user={user} />}
       {view === "ranking" && <RankingPage />}
+      {view === "voting" && <VotingPage />}
 
     </div>
   );
