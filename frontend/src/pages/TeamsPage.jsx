@@ -796,21 +796,6 @@ export default function TeamsPage({ user }) {
                       🎲 Sortear Times Equilibrados
                     </button>
 
-                    {confirmedList.length > 0 && (
-                      <div style={{ marginTop: "15px", background: "#f8f9fa", border: "1px solid #dee2e6", borderRadius: "8px", padding: "12px" }}>
-                        <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "8px" }}>
-                          ✅ Confirmados para esta partida
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          {confirmedList.map((jogador) => (
-                            <div key={jogador.ordem} style={{textAlign:"left", fontSize: "14px", color: "#555" }}>
-                              <strong>{jogador.ordem}.</strong> {jogador.position} - {jogador.name}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
                 
@@ -854,7 +839,25 @@ export default function TeamsPage({ user }) {
                 </div>
             )}
           </>
-        )}      
+        )}
+
+        {/* Apresenta lista de jogadores confirmados enquanto o sorteio não for realizado */}
+        {!selectedMatch.is_drawn && teamA.length === 0 && confirmedList.length > 0 && (
+          <div style={{ marginTop: "15px", background: "#f8f9fa", border: "1px solid #dee2e6", borderRadius: "8px", padding: "12px" }}>
+            <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "8px" }}>
+              ✅ Confirmados para esta partida
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {confirmedList.map((jogador) => (
+                <div key={jogador.ordem} style={{textAlign:"left", fontSize: "14px", color: "#555" }}>
+                  <strong>{jogador.ordem}.</strong> {jogador.position} - {jogador.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}        
+
         </div>
       )}
     </div>
