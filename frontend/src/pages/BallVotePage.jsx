@@ -154,7 +154,7 @@ export default function BallVotePage({ user }) {
     if (!matchDate) return null;
 
     const start = new Date(`${matchDate}T22:10:00-03:00`);
-    const end = new Date(`${matchDate}T01:00:00-03:00`);
+    const end = new Date(`${matchDate}T00:20:00-03:00`);
   end.setDate(end.getDate() + 1);
 
     return { start, end };
