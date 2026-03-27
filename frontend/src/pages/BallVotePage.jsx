@@ -153,8 +153,8 @@ export default function BallVotePage({ user }) {
   const getVotingWindow = (matchDate) => {
     if (!matchDate) return null;
 
-    const start = new Date(`${matchDate}T22:10:00-03:00`);
-    const end = new Date(`${matchDate}T00:20:00-03:00`);
+    const start = new Date(`${matchDate}T22:30:00-03:00`);
+    const end = new Date(start.getTime() + 15 * 60 * 1000);
   end.setDate(end.getDate() + 1);
 
     return { start, end };
