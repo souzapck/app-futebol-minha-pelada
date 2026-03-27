@@ -155,7 +155,6 @@ export default function BallVotePage({ user }) {
 
     const start = new Date(`${matchDate}T22:30:00-03:00`);
     const end = new Date(start.getTime() + 15 * 60 * 1000);
-  
 
     return { start, end };
   };
@@ -670,9 +669,10 @@ export default function BallVotePage({ user }) {
                       {voteSummary.vencedoresCheia.length === 0 ? (
                         <div style={{ color: "#555" }}>Nenhum voto.</div>
                       ) : voteSummary.vencedoresCheia.length === 1 ? (
-                        <div style={{ color: "#333", marginBottom: "10px" }}>
-                          <strong>Vencedor:</strong> {formatPlayerLine(voteSummary.vencedoresCheia[0])} —{" "}
-                          <strong>{voteSummary.vencedoresCheia[0].votes}</strong> voto(s)
+                        <div style={{ color: "#333", marginBottom: "25px" }}>
+                          {/*<strong>Vencedor:</strong>*/} 
+                          <strong>{formatPlayerLine(voteSummary.vencedoresCheia[0])} </strong>
+                           {/*{" "}—{" "} <strong>{voteSummary.vencedoresCheia[0].votes}</strong> voto(s) */}
                         </div>
                       ) : (
                         <div style={{ color: "#333", marginBottom: "10px" }}>
@@ -684,9 +684,9 @@ export default function BallVotePage({ user }) {
                       )}
 
                       {voteSummary.cheiaRanking.length > 0 && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                           {voteSummary.cheiaRanking.map((p, index) => (
-                            <div key={p.id} style={{ fontSize: "14px", color: "#444" }}>
+                            <div key={p.id} style={{ marginLeft: "20px", textAlign: "left", fontSize: "14px", color: "#444" }}>
                               <strong>{index + 1}.</strong> {formatPlayerLine(p)} — {p.votes} voto(s)
                             </div>
                           ))}
@@ -709,9 +709,10 @@ export default function BallVotePage({ user }) {
                       {voteSummary.vencedoresMurcha.length === 0 ? (
                         <div style={{ color: "#555" }}>Nenhum voto.</div>
                       ) : voteSummary.vencedoresMurcha.length === 1 ? (
-                        <div style={{ color: "#333", marginBottom: "10px" }}>
-                          <strong>Vencedor:</strong> {formatPlayerLine(voteSummary.vencedoresMurcha[0])} —{" "}
-                          <strong>{voteSummary.vencedoresMurcha[0].votes}</strong> voto(s)
+                        <div style={{ color: "#333", marginBottom: "25px" }}>
+                          {/*<strong>Vencedor:</strong>*/} 
+                          <strong>{formatPlayerLine(voteSummary.vencedoresMurcha[0])} </strong>
+                          {/*—{" "} <strong>{voteSummary.vencedoresMurcha[0].votes}</strong> voto(s)*/}
                         </div>
                       ) : (
                         <div style={{ color: "#333", marginBottom: "10px" }}>
@@ -723,9 +724,9 @@ export default function BallVotePage({ user }) {
                       )}
 
                       {voteSummary.murchaRanking.length > 0 && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                           {voteSummary.murchaRanking.map((p, index) => (
-                            <div key={p.id} style={{ fontSize: "14px", color: "#444" }}>
+                            <div key={p.id} style={{marginLeft: "20px", textAlign: "left", fontSize: "14px", color: "#444" }}>
                               <strong>{index + 1}.</strong> {formatPlayerLine(p)} — {p.votes} voto(s)
                             </div>
                           ))}

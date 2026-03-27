@@ -11,6 +11,7 @@ export default function TeamsPage({ user }) {
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [goals, setGoals] = useState({});
+  const [ownGoals, setOwnGoals] = useState({});
   const [shirtMap, setShirtMap] = useState({});
   const [confirmedList, setConfirmedList] = useState([]);
 
@@ -107,7 +108,8 @@ export default function TeamsPage({ user }) {
           phone: player.phone,
           status: item.status,
           team: item.team,
-          goals: item.goals || 0
+          goals: item.goals || 0,
+          own_goals: item.own_goals || 0
         };
       })
       .filter(Boolean);
@@ -137,16 +139,21 @@ export default function TeamsPage({ user }) {
       setScoreB(match.score_b || 0);
 
       const goalsMap = {};
+      const ownGoalsMap = {};
+
       confirmados.forEach(p => {
         goalsMap[p.id] = p.goals || 0;
+        ownGoalsMap[p.id] = p.own_goals || 0;
       });
       setGoals(goalsMap);
+      setOwnGoals(ownGoalsMap);
     } else {
-      setTeamA([]);
-      setTeamB([]);
-      setScoreA(0);
-      setScoreB(0);
-      setGoals({});
+        setTeamA([]);
+        setTeamB([]);
+        setScoreA(0);
+        setScoreB(0);
+        setGoals({});
+        setOwnGoals({});
     }
   };
 
@@ -310,7 +317,10 @@ export default function TeamsPage({ user }) {
           .from("match_player")
           .update({
             team: "A",
-            shirt_number: shirtMap[p.id] === "" ? null : Number(shirtMap[p.id])
+            shirt_number:
+              shirtMap[p.id] === "" || shirtMap[p.id] === undefined
+                ? null
+                : Number(shirtMap[p.id])
           })
           .eq("match_id", selectedMatch.id)
           .eq("player_id", p.id)
@@ -321,7 +331,10 @@ export default function TeamsPage({ user }) {
           .from("match_player")
           .update({
             team: "B",
-            shirt_number: shirtMap[p.id] === "" ? null : Number(shirtMap[p.id])
+            shirt_number:
+              shirtMap[p.id] === "" || shirtMap[p.id] === undefined
+                ? null
+                : Number(shirtMap[p.id])
           })
           .eq("match_id", selectedMatch.id)
           .eq("player_id", p.id)
@@ -368,7 +381,7 @@ export default function TeamsPage({ user }) {
       // limpa times e gols dos jogadores
       const { error: mpError } = await supabase
         .from("match_player")
-        .update({ team: null, goals: 0 })
+        .update({ team: null, goals: 0, own_goals: 0 })
         .eq("match_id", selectedMatch.id);
 
       if (mpError) {
@@ -409,8 +422,17 @@ export default function TeamsPage({ user }) {
 
 
   const handleGoalChange = (playerId, amount) => {
-    setGoals(prev => ({ ...prev, [playerId]: Math.max(0, parseInt(amount) || 0) }));
+    setGoals(prev => ({ 
+      ...prev, 
+      [playerId]: Math.max(0, parseInt(amount) || 0) }));
   };
+
+  const handleOwnGoalChange = (playerId, amount) => {
+    setOwnGoals(prev => ({
+      ...prev,
+      [playerId]: Math.max(0, parseInt(amount) || 0)
+    }));
+  };  
 
   const salvarEstatisticas = async () => {
     try {
@@ -430,10 +452,20 @@ export default function TeamsPage({ user }) {
       }
 
       // salva gols por jogador
-      const goalUpdates = Object.entries(goals).map(([playerId, goalCount]) =>
+      const playerIds = Array.from(
+        new Set([
+          ...Object.keys(goals),
+          ...Object.keys(ownGoals)
+        ])
+      );
+
+      const goalUpdates = playerIds.map((playerId) =>
         supabase
           .from("match_player")
-          .update({ goals: Number(goalCount) || 0 })
+          .update({
+            goals: Number(goals[playerId]) || 0,
+            own_goals: Number(ownGoals[playerId]) || 0
+          })
           .eq("match_id", selectedMatch.id)
           .eq("player_id", Number(playerId))
       );
@@ -492,186 +524,393 @@ export default function TeamsPage({ user }) {
 
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
-      
-      {/* Botões Superiores de Datas (Carrossel) */}
-        <div style={{ display: "flex", gap: "10px", overflowX: "auto", marginBottom: "20px", paddingBottom: "10px" }}>
-            {matches.map(m => (
+  <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: "10px",
+        overflowX: "auto",
+        marginBottom: "20px",
+        paddingBottom: "10px"
+      }}
+    >
+      {matches.map((m) => (
+        <button
+          key={m.id}
+          onClick={() => loadMatchData(m)}
+          style={{
+            minWidth: "120px",
+            padding: "10px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd",
+            background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff",
+            color: "#333",
+            fontWeight: selectedMatch?.id === m.id ? "bold" : "normal"
+          }}
+        >
+          {m.date.split("-").reverse().join("/")} {m.is_drawn && "🔒"}
+        </button>
+      ))}
+    </div>
+
+    {selectedMatch && (
+      <div
+        style={{
+          minWidth: "300px",
+          maxWidth: "570px",        
+          background: "#f8f9fa",
+          padding: "20px",
+          borderRadius: "12px",
+          border: "1px solid #dddddd"
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px"
+          }}
+        >
+          <h2 style={{ margin: 0, color: "#333" }}>
+            {selectedMatch.is_drawn ? "🔒 Jogo Fechado" : "🎲 Escalação não realizada"}
+          </h2>
+
+          {teamA.length > 0 && (
             <button
-                key={m.id}
-                onClick={() => loadMatchData(m)}
-                style={{
-                minWidth: "120px", padding: "10px", borderRadius: "8px", cursor: "pointer",
-                border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd",
-                background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff",
-                color: "#333", /* Força a cor do texto para não ficar branco no fundo branco */
-                fontWeight: selectedMatch?.id === m.id ? "bold" : "normal",
-                }}
+              onClick={copiarWhatsApp}
+              style={{
+                background: "#25D366",
+                color: "white",
+                padding: "10px 16px",
+                borderRadius: "8px",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: "bold",
+                boxShadow: "0 2px 5px rgba(37,211,102,0.3)"
+              }}
             >
-                {m.date.split("-").reverse().join("/")} {m.is_drawn && "🔒"}
+              📱 WhatsApp
             </button>
-            ))}
+          )}
         </div>
 
-      {selectedMatch && (
-        <div style={{ width: "100%", maxWidth: "320px", background: "#f8f9fa", padding: "20px", borderRadius: "12px", border: "1px solid #ddd" }}>
-          
-          {/* Cabeçalho da Área do Jogo */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-            <h2 style={{ margin: 0, color: "#333" }}>
-              {selectedMatch.is_drawn ? "🔒 Jogo Fechado" : "🎲 Escalação não realizada"}
-            </h2>
-            {(teamA.length > 0) && (
-              <button 
-                onClick={copiarWhatsApp} 
-                style={{ 
-                  background: "#25D366", color: "white", padding: "10px 16px", 
-                  borderRadius: "8px", border: "none", cursor: "pointer", 
-                  fontWeight: "bold", boxShadow: "0 2px 5px rgba(37,211,102,0.3)" 
+        {(teamA.length > 0 || teamB.length > 0) && (
+          <div
+            style={{
+              display: "flex",
+              gap: "20px",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              marginBottom: "25px"
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                background: "#fff",
+                padding: "15px",
+                borderRadius: "10px",
+                border: "3px solid #0b0b0b",
+                boxShadow: "0 4px 6px rgba(0,123,255,0.1)"
+              }}
+            >
+              <h3
+                style={{
+                  textAlign: "center",
+                  color: "#000102",
+                  marginTop: 0,
+                  marginBottom: "15px",
+                  fontWeight: "bold",
+                  fontSize: "16px"
                 }}
               >
-                📱 WhatsApp
-              </button>
-            )}
-          </div>
+                ⚫ Time Preto/Rosa{" "}
+                <span style={{ fontSize: "10px", color: "#666", fontWeight: "normal" }}>
+                  (⭐ {calcForca(teamA)})
+                </span>
+              </h3>
 
-          {/* ÁREA DOS TIMES */}
-          {(teamA.length > 0 || teamB.length > 0) && (
-            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", justifyContent: "center", marginBottom: "25px" }}>
-              
-              {/* TIME A */}
-              <div style={{ width: "100%", background: "#fff", padding: "15px", borderRadius: "10px", border: "3px solid #0b0b0b", boxShadow: "0 4px 6px rgba(0,123,255,0.1)" }}>
-                <h3 style={{ textAlign: "center", color: "#000102", marginTop: 0, marginBottom: "15px", fontWeight: "bold", fontSize: "16px" }}>
-                  ⚫ Time Preto/Rosa <span style={{ fontSize: "10px", color: "#666", fontWeight: "normal" }}>(⭐ {calcForca(teamA)})</span>
-                </h3>
-                
-                {selectedMatch.is_drawn && (
-                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "12px", background: "#e9ecef", padding: "6px", borderRadius: "8px" }}>
-                    <label style={{ fontWeight: "bold", marginRight: "10px", color: "#333", fontSize: "14px" }}>Placar:</label>
-                    <input type="number" value={scoreA} onChange={(e) => setScoreA(e.target.value)} style={{ width: "50px", textAlign: "center", fontSize: "18px", fontWeight: "bold", padding: "4px", borderRadius: "6px", border: "1px solid #ccc", color: "#000", backgroundColor: "#fff" }} />
-                  </div>
-                )}
-                
-              {ordenarPorPosicao(teamA).map(p => (
+              {selectedMatch.is_drawn && (
                 <div
-                  key={p.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginBottom: "12px",
+                    background: "#e9ecef",
+                    padding: "6px",
+                    borderRadius: "8px"
+                  }}
+                >
+                  <label
+                    style={{
+                      fontWeight: "bold",
+                      marginRight: "10px",
+                      color: "#333",
+                      fontSize: "14px"
+                    }}
+                  >
+                    Placar:
+                  </label>
+                  <input
+                    type="number"
+                    value={scoreA}
+                    onChange={(e) => setScoreA(e.target.value)}
+                    style={{
+                      width: "50px",
+                      textAlign: "center",
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      padding: "4px",
+                      borderRadius: "6px",
+                      border: "1px solid #ccc",
+                      color: "#000",
+                      backgroundColor: "#fff"
+                    }}
+                  />
+                </div>
+              )}
+
+              {selectedMatch.is_drawn && (
+                <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    padding: "6px 0",
-                    borderBottom: "1px solid #f1f1f1",
                     alignItems: "center",
-                    fontSize: "15px",
-                    color: "#333",
-                    gap: "8px"
+                    marginBottom: "8px",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    color: "#666"
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        width: "52px",
-                        minWidth: "52px",
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        marginRight: "10px"
-                      }}
-                    >
-                      {p.fixed_shirt_number ? (
-                        <span
-                          style={{
-                            width: "48px",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                            fontSize: "13px",
-                            color: "#333",
-                            display: "inline-block"
-                          }}
-                        >
-                          {String(p.shirt_number).padStart(2, "0")}
-                        </span>
-                      ) : (
+                  <span>Jogador</span>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <span style={{ width: "40px", textAlign: "center" }}>⚽</span>
+                    <span style={{ width: "40px", textAlign: "center" }}>🥅</span>
+                  </div>
+                </div>
+              )}
+
+              {ordenarPorPosicao(teamA)
+                .filter(Boolean)
+                .map((p) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "6px 0",
+                      borderBottom: "1px solid #f1f1f1",
+                      alignItems: "center",
+                      fontSize: "15px",
+                      color: "#333",
+                      gap: "5px"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: "30px",
+                          minWidth: "30px",
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          marginRight: "10px"
+                        }}
+                      >
+                        {p.fixed_shirt_number ? (
+                          <span
+                            style={{
+                              width: "30px",
+                              textAlign: "left",
+                              fontWeight: "bold",
+                              fontSize: "11px",
+                              color: "#333",
+                              display: "inline-block"
+                            }}
+                          >
+                            {String(p.shirt_number).padStart(2, "0")}
+                          </span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            max="99"
+                            value={shirtMap?.[p.id] ?? ""}
+                            onChange={(e) => handleShirtChange(p.id, e.target.value)}
+                            disabled={selectedMatch.is_drawn}
+                            style={{
+                              width: "40px",
+                              padding: "3px",
+                              textAlign: "center",
+                              borderRadius: "4px",
+                              border: "1px solid #999",
+                              backgroundColor: "#fff",
+                              color: "#000",
+                              fontWeight: "bold",
+                              fontSize: "11px",
+                              outline: "none",
+                              boxSizing: "border-box"
+                            }}
+                            placeholder=" "
+                          />
+                        )}
+                      </div>
+
+                      <span
+                        style={{
+                          textAlign: "left",
+                          fontSize: "11px",
+                          fontWeight: "500",
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {`(${p.position}) - ${p.name}`}
+                      </span>
+                    </div>
+
+                    {selectedMatch.is_drawn && (
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                         <input
                           type="number"
                           min="0"
-                          max="99"
-                          value={shirtMap[p.id] ?? ""}
-                          onChange={(e) => handleShirtChange(p.id, e.target.value)}
-                          disabled={selectedMatch.is_drawn}
+                          value={goals?.[p.id] || 0}
+                          onChange={(e) => handleGoalChange(p.id, e.target.value)}
                           style={{
-                            width: "48px",
+                            width: "30px",
                             padding: "3px",
                             textAlign: "center",
                             borderRadius: "4px",
                             border: "1px solid #999",
-                            backgroundColor: "#fff",
-                            color: "#000",
+                            backgroundColor: "#f8f9fa",
+                            color: "#048804",
                             fontWeight: "bold",
-                            fontSize: "13px",
-                            outline: "none",
-                            boxSizing: "border-box"
+                            fontSize: "11px",
+                            outline: "none"
                           }}
-                          placeholder="--"
+                          title="Gols"
                         />
-                      )}
-                    </div>
 
-                    <span
-                      style={{
-                        textAlign: "left",
-                        fontSize: "14px",
-                        fontWeight: "500",
-                        flex: 1,
-                        minWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap"
-                      }}
-                    >
-                      {`(${p.position}) - ${p.name} `}
-                    </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={ownGoals?.[p.id] || 0}
+                          onChange={(e) => handleOwnGoalChange(p.id, e.target.value)}
+                          style={{
+                            width: "30px",
+                            padding: "3px",
+                            textAlign: "center",
+                            borderRadius: "4px",
+                            border: "1px solid #c77d7d",
+                            backgroundColor: "#fff5f5",
+                            color: "#8b0000",
+                            fontWeight: "bold",
+                            fontSize: "11px",
+                            outline: "none"
+                          }}
+                          title="Gols contra"
+                        />
+                      </div>
+                    )}
                   </div>
+                ))}
+            </div>
 
-                  {selectedMatch.is_drawn && (
-                    <input
-                      type="number"
-                      min="0"
-                      value={goals[p.id] || 0}
-                      onChange={(e) => handleGoalChange(p.id, e.target.value)}
-                      style={{
-                        width: "40px",
-                        minWidth: "40px",
-                        padding: "3px",
-                        textAlign: "center",
-                        borderRadius: "4px",
-                        border: "1px solid #999",
-                        backgroundColor: "#f8f9fa",
-                        color: "#000",
-                        fontWeight: "bold",
-                        fontSize: "13px",
-                        outline: "none"
-                      }}
-                      title="Gols"
-                    />
-                  )}
+            <div
+              style={{
+                width: "100%",
+                background: "#fff",
+                padding: "15px",
+                borderRadius: "10px",
+                border: "3px solid #c00707",
+                boxShadow: "0 4px 6px rgba(220,53,69,0.1)"
+              }}
+            >
+              <h3
+                style={{
+                  textAlign: "center",
+                  color: "#000102",
+                  marginTop: 0,
+                  marginBottom: "15px",
+                  fontWeight: "bold",
+                  fontSize: "16px"
+                }}
+              >
+                🔴 Time Vermelho/Branco{" "}
+                <span style={{ fontSize: "10px", color: "#666", fontWeight: "normal" }}>
+                  (⭐ {calcForca(teamB)})
+                </span>
+              </h3>
+
+              {selectedMatch.is_drawn && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginBottom: "12px",
+                    background: "#e9ecef",
+                    padding: "6px",
+                    borderRadius: "8px"
+                  }}
+                >
+                  <label
+                    style={{
+                      fontWeight: "bold",
+                      marginRight: "10px",
+                      color: "#333",
+                      fontSize: "14px"
+                    }}
+                  >
+                    Placar:
+                  </label>
+                  <input
+                    type="number"
+                    value={scoreB}
+                    onChange={(e) => setScoreB(e.target.value)}
+                    style={{
+                      width: "50px",
+                      textAlign: "center",
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      padding: "4px",
+                      borderRadius: "6px",
+                      border: "1px solid #ccc",
+                      color: "#000",
+                      backgroundColor: "#fff"
+                    }}
+                  />
                 </div>
-              ))}
+              )}
 
-              </div>
-
-              {/* TIME B */}
-              <div style={{ width: "100%", background: "#fff", padding: "15px", borderRadius: "10px", border: "3px solid #c00707", boxShadow: "0 4px 6px rgba(220,53,69,0.1)" }}>
-                <h3 style={{ textAlign: "center", color: "#000102", marginTop: 0, marginBottom: "15px", fontWeight: "bold", fontSize: "16px" }}>
-                  🔴 Time Vermelho/Branco <span style={{ fontSize: "10px", color: "#666", fontWeight: "normal" }}>(⭐ {calcForca(teamB)})</span>
-                </h3>
-                
-                {selectedMatch.is_drawn && (
-                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "12px", background: "#e9ecef", padding: "6px", borderRadius: "8px" }}>
-                    <label style={{ fontWeight: "bold", marginRight: "10px", color: "#333", fontSize: "14px" }}>Placar:</label>
-                    <input type="number" value={scoreB} onChange={(e) => setScoreB(e.target.value)} style={{ width: "50px", textAlign: "center", fontSize: "18px", fontWeight: "bold", padding: "4px", borderRadius: "6px", border: "1px solid #ccc", color: "#000", backgroundColor: "#fff" }} />
+              {selectedMatch.is_drawn && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "6px",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    color: "#666"
+                  }}
+                >
+                  <span>Jogador</span>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <span style={{ width: "40px", textAlign: "center" }}>⚽</span>
+                    <span style={{ width: "40px", textAlign: "center" }}>🥅</span>
                   </div>
-                )}
-                
-                {ordenarPorPosicao(teamB).map(p => (
+                </div>
+              )}
+
+              {ordenarPorPosicao(teamB)
+                .filter(Boolean)
+                .map((p) => (
                   <div
                     key={p.id}
                     style={{
@@ -688,8 +927,8 @@ export default function TeamsPage({ user }) {
                     <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
                       <div
                         style={{
-                          width: "52px",
-                          minWidth: "52px",
+                          width: "30px",
+                          minWidth: "30px",
                           display: "flex",
                           justifyContent: "flex-end",
                           marginRight: "10px"
@@ -698,10 +937,10 @@ export default function TeamsPage({ user }) {
                         {p.fixed_shirt_number ? (
                           <span
                             style={{
-                              width: "48px",
-                              textAlign: "center",
+                              width: "30px",
+                              textAlign: "left",
                               fontWeight: "bold",
-                              fontSize: "13px",
+                              fontSize: "11px",
                               color: "#333",
                               display: "inline-block"
                             }}
@@ -713,11 +952,11 @@ export default function TeamsPage({ user }) {
                             type="number"
                             min="0"
                             max="99"
-                            value={shirtMap[p.id] ?? ""}
+                            value={shirtMap?.[p.id] ?? ""}
                             onChange={(e) => handleShirtChange(p.id, e.target.value)}
                             disabled={selectedMatch.is_drawn}
                             style={{
-                              width: "48px",
+                              width: "40px",
                               padding: "3px",
                               textAlign: "center",
                               borderRadius: "4px",
@@ -725,11 +964,11 @@ export default function TeamsPage({ user }) {
                               backgroundColor: "#fff",
                               color: "#000",
                               fontWeight: "bold",
-                              fontSize: "13px",
+                              fontSize: "11px",
                               outline: "none",
                               boxSizing: "border-box"
                             }}
-                            placeholder="--"
+                            placeholder=" "
                           />
                         )}
                       </div>
@@ -737,7 +976,7 @@ export default function TeamsPage({ user }) {
                       <span
                         style={{
                           textAlign: "left",
-                          fontSize: "14px",
+                          fontSize: "11px",
                           fontWeight: "500",
                           flex: 1,
                           minWidth: 0,
@@ -751,116 +990,221 @@ export default function TeamsPage({ user }) {
                     </div>
 
                     {selectedMatch.is_drawn && (
-                      <input
-                        type="number"
-                        min="0"
-                        value={goals[p.id] || 0}
-                        onChange={(e) => handleGoalChange(p.id, e.target.value)}
-                        style={{
-                          width: "40px",
-                          minWidth: "40px",
-                          padding: "3px",
-                          textAlign: "center",
-                          borderRadius: "4px",
-                          border: "1px solid #999",
-                          backgroundColor: "#f8f9fa",
-                          color: "#000",
-                          fontWeight: "bold",
-                          fontSize: "13px",
-                          outline: "none"
-                        }}
-                        title="Gols"
-                      />
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <input
+                          type="number"
+                          min="0"
+                          value={goals?.[p.id] || 0}
+                          onChange={(e) => handleGoalChange(p.id, e.target.value)}
+                          style={{
+                            width: "30px",
+                            padding: "3px",
+                            textAlign: "center",
+                            borderRadius: "4px",
+                            border: "1px solid #999",
+                            backgroundColor: "#f8f9fa",
+                            color: "#048804",
+                            fontWeight: "bold",
+                            fontSize: "11px",
+                            outline: "none"
+                          }}
+                          title="Gols"
+                        />
+
+                        <input
+                          type="number"
+                          min="0"
+                          value={ownGoals?.[p.id] || 0}
+                          onChange={(e) => handleOwnGoalChange(p.id, e.target.value)}
+                          style={{
+                            width: "30px",
+                            padding: "3px",
+                            textAlign: "center",
+                            borderRadius: "4px",
+                            border: "1px solid #c77d7d",
+                            backgroundColor: "#fff5f5",
+                            color: "#8b0000",
+                            fontWeight: "bold",
+                            fontSize: "11px",
+                            outline: "none"
+                          }}
+                          title="Gols contra"
+                        />
+                      </div>
                     )}
                   </div>
                 ))}
-
-              </div>
             </div>
-          )}
+          </div>
+        )}
 
-        {/* PAINEL DE BOTÕES DE AÇÃO (Visível APENAS para o Administrador) */}
         {user?.is_admin && (
           <>
             {!selectedMatch.is_drawn ? (
-                
-                <div style={{ display: "flex", gap: "12px", flexDirection: "column", background: "#fff", padding: "15px", borderRadius: "10px", border: "1px solid #dee2e6" }}>
-                
-                {/* O botão de Sortear some assim que o sorteio é feito pela primeira vez */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  flexDirection: "column",
+                  background: "#fff",
+                  padding: "15px",
+                  borderRadius: "10px",
+                  border: "1px solid #dee2e6"
+                }}
+              >
                 {teamA.length === 0 && (
+                  <button
+                    onClick={sortearTimes}
+                    style={{
+                      width: "100%",
+                      padding: "16px",
+                      background: "#007bff",
+                      color: "white",
+                      borderRadius: "8px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      boxShadow: "0 4px 6px rgba(0,123,255,0.2)"
+                    }}
+                  >
+                    🎲 Sortear Times Equilibrados
+                  </button>
+                )}
+
+                {teamA.length > 0 && (
                   <>
-                    <button 
-                      onClick={sortearTimes} 
-                      style={{ width: "100%", padding: "16px", background: "#007bff", color: "white", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: "bold", boxShadow: "0 4px 6px rgba(0,123,255,0.2)" }}
+                    <button
+                      onClick={confirmarSorteio}
+                      style={{
+                        width: "100%",
+                        padding: "16px",
+                        background: "#28a745",
+                        color: "white",
+                        borderRadius: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "18px",
+                        fontWeight: "bold",
+                        boxShadow: "0 4px 6px rgba(40,167,69,0.2)"
+                      }}
                     >
-                      🎲 Sortear Times Equilibrados
+                      🔒 Confirmar Sorteio e Travar Jogo
                     </button>
 
+                    <button
+                      onClick={sortearTimes}
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        background: "#f8f9fa",
+                        color: "#6c757d",
+                        borderRadius: "8px",
+                        border: "1px solid #ced4da",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        marginTop: "5px"
+                      }}
+                    >
+                      🔄 Não gostei, refazer sorteio
+                    </button>
                   </>
                 )}
-                
-                {/* Se os times já foram sorteados, mostra o botão de Confirmar */}
-                {teamA.length > 0 && (
-                    <>
-                    <button 
-                        onClick={confirmarSorteio} 
-                        style={{ width: "100%", padding: "16px", background: "#28a745", color: "white", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: "bold", boxShadow: "0 4px 6px rgba(40,167,69,0.2)" }}
-                    >
-                        🔒 Confirmar Sorteio e Travar Jogo
-                    </button>
-                    
-                    <button 
-                        onClick={sortearTimes} 
-                        style={{ width: "100%", padding: "10px", background: "#f8f9fa", color: "#6c757d", borderRadius: "8px", border: "1px solid #ced4da", cursor: "pointer", fontSize: "14px", marginTop: "5px" }}
-                    >
-                        🔄 Não gostei, refazer sorteio
-                    </button>
-                    </>
-                )}
-                </div>
+              </div>
             ) : (
-                <div style={{ display: "flex", gap: "12px", flexDirection: "column", background: "#fff", padding: "15px", borderRadius: "10px", border: "1px solid #dee2e6" }}>
-                <button 
-                    onClick={salvarEstatisticas} 
-                    style={{ width: "100%", padding: "16px", background: "#ffc107", color: "#333", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: "bold", boxShadow: "0 4px 6px rgba(255,193,7,0.2)" }}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  flexDirection: "column",
+                  background: "#fff",
+                  padding: "15px",
+                  borderRadius: "10px",
+                  border: "1px solid #dee2e6"
+                }}
+              >
+                <button
+                  onClick={salvarEstatisticas}
+                  style={{
+                    width: "100%",
+                    padding: "16px",
+                    background: "#ffc107",
+                    color: "#333",
+                    borderRadius: "8px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    boxShadow: "0 4px 6px rgba(255,193,7,0.2)"
+                  }}
                 >
-                    💾 Salvar Placar e Gols
+                  💾 Salvar Placar e Gols
                 </button>
-                
-                {/* O botão "Reabrir" SÓ APARECE se nenhum time fez gol E nenhum jogador tiver gol anotado */}
-                {(Number(scoreA) === 0 && Number(scoreB) === 0 && Object.values(goals).every(g => Number(g) === 0)) && (
-                    <button 
-                    onClick={desfazerSorteio} 
-                    style={{ width: "100%", padding: "14px", background: "#fff", color: "#dc3545", borderRadius: "8px", border: "2px solid #dc3545", cursor: "pointer", fontSize: "16px", fontWeight: "bold", marginTop: "10px" }}
-                    >
+
+                {(Number(scoreA) === 0 &&
+                  Number(scoreB) === 0 &&
+                  Object.values(goals).every((g) => Number(g) === 0) &&
+                  Object.values(ownGoals).every((g) => Number(g) === 0)) && (
+                  <button
+                    onClick={desfazerSorteio}
+                    style={{
+                      width: "100%",
+                      padding: "14px",
+                      background: "#fff",
+                      color: "#dc3545",
+                      borderRadius: "8px",
+                      border: "2px solid #dc3545",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      fontWeight: "bold",
+                      marginTop: "10px"
+                    }}
+                  >
                     ⚠️ Reabrir Jogo (Desfazer Sorteio)
-                    </button>
+                  </button>
                 )}
-                </div>
+              </div>
             )}
           </>
         )}
 
-        {/* Apresenta lista de jogadores confirmados enquanto o sorteio não for realizado */}
         {!selectedMatch.is_drawn && teamA.length === 0 && confirmedList.length > 0 && (
-          <div style={{ marginTop: "15px", background: "#f8f9fa", border: "1px solid #dee2e6", borderRadius: "8px", padding: "12px" }}>
-            <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "8px" }}>
+          <div
+            style={{
+              marginTop: "15px",
+              background: "#f8f9fa",
+              border: "1px solid #dee2e6",
+              borderRadius: "8px",
+              padding: "12px"
+            }}
+          >
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: "14px",
+                color: "#333",
+                marginBottom: "8px"
+              }}
+            >
               ✅ Confirmados para esta partida
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {confirmedList.map((jogador) => (
-                <div key={jogador.ordem} style={{textAlign:"left", fontSize: "14px", color: "#555" }}>
+                <div
+                  key={jogador.ordem}
+                  style={{ textAlign: "left", fontSize: "14px", color: "#555" }}
+                >
                   <strong>{jogador.ordem}.</strong> {jogador.position} - {jogador.name}
                 </div>
               ))}
             </div>
           </div>
-        )}        
+        )}
+      </div>
+    )}
+  </div>
+);
 
-        </div>
-      )}
-    </div>
-  );
 }
 

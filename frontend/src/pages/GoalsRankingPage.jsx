@@ -36,7 +36,14 @@ export default function RankingPage() {
           );
 
           const jogos = participacoes.length;
-          const gols = participacoes.reduce((total, mp) => total + (Number(mp.goals) || 0), 0);
+          const gols = participacoes.reduce(
+            (total, mp) => total + (Number(mp.goals) || 0),
+            0
+          );
+          const golsContra = participacoes.reduce(
+            (total, mp) => total + (Number(mp.own_goals) || 0),
+            0
+          );
           const media = jogos > 0 ? (gols / jogos).toFixed(2) : "0.00";
 
           return {
@@ -46,13 +53,23 @@ export default function RankingPage() {
             shirt_number: player.shirt_number,
             jogos,
             gols,
+            golsContra,
             media
           };
         })
         .filter((jogador) => jogador.jogos > 0)
         .sort((a, b) => {
+          // 1. Mais gols fica na frente
           if (b.gols !== a.gols) return b.gols - a.gols;
-          return Number(b.media) - Number(a.media);
+
+          // 2. Em empate de gols, menos gols contra fica na frente
+          if (a.golsContra !== b.golsContra) return a.golsContra - b.golsContra;
+
+          // 3. Se ainda empatar, maior média fica na frente
+          if (Number(b.media) !== Number(a.media)) return Number(b.media) - Number(a.media);
+
+          // 4. Desempate final por nome
+          return a.name.localeCompare(b.name);
         });
 
       setRanking(rankingCalculado);
@@ -70,19 +87,45 @@ export default function RankingPage() {
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
-      
-      <div style={{ background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)", padding: "20px", borderRadius: "12px", color: "white", textAlign: "center", marginBottom: "25px", boxShadow: "0 4px 10px rgba(0,0,0,0.2)" }}>
+      <div
+        style={{
+          background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+          padding: "20px",
+          borderRadius: "12px",
+          color: "white",
+          textAlign: "center",
+          marginBottom: "25px",
+          boxShadow: "0 4px 10px rgba(0,0,0,0.2)"
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: "28px" }}>⚽ Artilharia Geral</h2>
-        <p style={{ margin: "5px 0 0 0", opacity: 0.8 }}>Ranking dos maiores matadores da Quinta-feira!</p>
+        <p style={{ margin: "5px 0 0 0", opacity: 0.8 }}>
+          Ranking dos maiores matadores da Quinta-feira!
+        </p>
       </div>
 
       {ranking.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#666", background: "#f8f9fa", borderRadius: "12px" }}>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "40px",
+            color: "#666",
+            background: "#f8f9fa",
+            borderRadius: "12px"
+          }}
+        >
           Nenhum jogo salvo com gols ainda.
         </div>
       ) : (
-        <div style={{ background: "#fff", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", border: "1px solid #eee" }}>
-          
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: "12px",
+            overflow: "hidden",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+            border: "1px solid #eee"
+          }}
+        >
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
               <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #ddd", color: "#444" }}>
@@ -90,36 +133,94 @@ export default function RankingPage() {
                 <th style={{ padding: "15px 10px" }}>Jogador</th>
                 <th style={{ padding: "15px 10px", textAlign: "center" }}>Jogos</th>
                 <th style={{ padding: "15px 10px", textAlign: "center" }}>Média</th>
-                <th style={{ padding: "15px 10px", textAlign: "center", color: "#28a745" }}>Gols</th>
+                <th style={{ padding: "15px 10px", textAlign: "center", color: "#28a745" }}>Gols P</th>
+                <th style={{ padding: "15px 10px", textAlign: "center", color: "#a80303" }}>Gols C</th>
               </tr>
             </thead>
             <tbody>
               {ranking.map((jogador, index) => (
-                <tr key={jogador.id} style={{ borderBottom: "1px solid #eee", backgroundColor: index === 0 ? "#fffbcc" : "transparent", transition: "background 0.2s" }}>
-                  <td style={{ padding: "15px 10px", textAlign: "center", fontWeight: "bold", fontSize: index < 3 ? "22px" : "16px", color: "#555" }}>
+                <tr
+                  key={jogador.id}
+                  style={{
+                    borderBottom: "1px solid #eee",
+                    backgroundColor: index === 0 ? "#fffbcc" : "transparent",
+                    transition: "background 0.2s"
+                  }}
+                >
+                  <td
+                    style={{
+                      padding: "15px 10px",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      fontSize: index < 3 ? "22px" : "16px",
+                      color: "#555"
+                    }}
+                  >
                     {getMedalha(index)}
                   </td>
-                  <td style={{ padding: "15px 10px", fontWeight: index === 0 ? "bold" : "normal", color: "#333" }}>
+
+                  <td
+                    style={{
+                      padding: "15px 10px",
+                      fontWeight: index === 0 ? "bold" : "normal",
+                      color: "#333"
+                    }}
+                  >
                     <div style={{ display: "flex", flexDirection: "column" }}>
                       <span>
                         <span style={{ color: "#007bff", marginRight: "5px" }}>
-                          {jogador.shirt_number ? String(jogador.shirt_number).padStart(2, '0') : "--"}
+                          {jogador.shirt_number
+                            ? String(jogador.shirt_number).padStart(2, "0")
+                            : "--"}
                         </span>
                         {jogador.name}
                       </span>
                       <span style={{ fontSize: "12px", color: "#888" }}>{jogador.position}</span>
                     </div>
                   </td>
-                  <td style={{ padding: "15px 10px", textAlign: "center", color: "#666" }}>{jogador.jogos}</td>
-                  <td style={{ padding: "15px 10px", textAlign: "center", color: "#666", fontSize: "14px" }}>{jogador.media}</td>
-                  <td style={{ padding: "15px 10px", textAlign: "center", fontWeight: "bold", fontSize: "18px", color: "#28a745" }}>
+
+                  <td style={{ padding: "15px 10px", textAlign: "center", color: "#666" }}>
+                    {jogador.jogos}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "15px 10px",
+                      textAlign: "center",
+                      color: "#666",
+                      fontSize: "14px"
+                    }}
+                  >
+                    {jogador.media}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "15px 10px",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      fontSize: "18px",
+                      color: "#28a745"
+                    }}
+                  >
                     {jogador.gols}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "15px 10px",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                      fontSize: "18px",
+                      color: "#a80303"
+                    }}
+                  >
+                    {jogador.golsContra}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          
         </div>
       )}
     </div>
