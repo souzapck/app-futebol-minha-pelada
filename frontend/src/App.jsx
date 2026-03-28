@@ -128,7 +128,7 @@ function App() {
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 900, margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <div
         style={{
           display: "flex",

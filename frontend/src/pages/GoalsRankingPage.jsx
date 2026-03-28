@@ -89,16 +89,18 @@ export default function RankingPage() {
     <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
       <div
         style={{
+          
           background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
           padding: "20px",
           borderRadius: "12px",
           color: "white",
           textAlign: "center",
+          fontSize: "12px",
           marginBottom: "25px",
           boxShadow: "0 4px 10px rgba(0,0,0,0.2)"
         }}
       >
-        <h2 style={{ margin: 0, fontSize: "28px" }}>⚽ Artilharia Geral</h2>
+        <h2 style={{ margin: 0, fontSize: "18px" }}>⚽ Artilharia Geral</h2>
         <p style={{ margin: "5px 0 0 0", opacity: 0.8 }}>
           Ranking dos maiores matadores da Quinta-feira!
         </p>
@@ -107,6 +109,7 @@ export default function RankingPage() {
       {ranking.length === 0 ? (
         <div
           style={{
+            display: "flex",
             textAlign: "center",
             padding: "40px",
             color: "#666",
@@ -119,6 +122,7 @@ export default function RankingPage() {
       ) : (
         <div
           style={{
+            display: "flex",
             background: "#fff",
             borderRadius: "12px",
             overflow: "hidden",
@@ -126,15 +130,15 @@ export default function RankingPage() {
             border: "1px solid #eee"
           }}
         >
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <table style={{ minWidth: "120px", width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #ddd", color: "#444" }}>
-                <th style={{ padding: "15px 10px", width: "50px", textAlign: "center" }}>Pos</th>
-                <th style={{ padding: "15px 10px" }}>Jogador</th>
-                <th style={{ padding: "15px 10px", textAlign: "center" }}>Jogos</th>
-                <th style={{ padding: "15px 10px", textAlign: "center" }}>Média</th>
-                <th style={{ padding: "15px 10px", textAlign: "center", color: "#28a745" }}>Gols P</th>
-                <th style={{ padding: "15px 10px", textAlign: "center", color: "#a80303" }}>Gols C</th>
+              <tr style={{ fontSize: "14px" ,background: "#f8f9fa", borderBottom: "2px solid #ddd", color: "#444" }}>
+                <th style={{ padding: "15px 10px", width: "12%", textAlign: "center" }}>Pos</th>
+                <th style={{ padding: "15px 10px", width: "40%" }}>Jogador</th>
+                <th style={{ padding: "15px 10px", width: "12%",textAlign: "center" }}>Jogos</th>
+                <th style={{ padding: "15px 10px", width: "12%", textAlign: "center" }}>Média</th>
+                <th style={{ padding: "15px 10px", width: "12%", textAlign: "center", color: "#28a745" }}>Gols P</th>
+                <th style={{ padding: "15px 10px", width: "12%", textAlign: "center", color: "#a80303" }}>Gols C</th>
               </tr>
             </thead>
             <tbody>
