@@ -1132,7 +1132,7 @@ export default function TeamsPage({ user }) {
   );
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
+    <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
       <div
         style={{
           display: "flex",

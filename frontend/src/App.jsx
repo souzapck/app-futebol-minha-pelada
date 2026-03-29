@@ -192,7 +192,7 @@ function App() {
     <div
       style={{
         padding: 20,
-        maxWidth: 900,
+        maxWidth: 600,
         margin: "0 auto",
         fontFamily: "Arial, sans-serif"
       }}

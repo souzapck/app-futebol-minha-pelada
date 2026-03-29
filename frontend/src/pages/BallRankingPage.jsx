@@ -226,7 +226,7 @@ export default function BallRankingPage() {
   );
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
+    <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
       <div
         style={{
           background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",

@@ -332,22 +332,7 @@ export default function BallVotePage({ user }) {
   };
 
   return (
-    <div style={{ maxWidth: 850, margin: "0 auto", paddingBottom: "40px" }}>
-      {/*<div
-        style={{
-          background: "#fff",
-          borderRadius: "12px",
-          padding: "20px",
-          border: "1px solid #eee",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-          marginBottom: "20px"
-        }}
-      >
-        <h3 style={{ marginTop: 0, color: "#333" }}>⚽ Bola cheia / 🎈 Bola murcha</h3>
-        <p style={{ color: "#666", marginBottom: 0 }}>
-          Escolha a partida e selecione os destaques positivos e negativos.
-        </p>
-      </div>*/}
+    <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
 
       <div
         style={{

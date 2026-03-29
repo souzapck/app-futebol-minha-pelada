@@ -7,7 +7,7 @@ export default function RankingPage() {
   const [subView, setSubView] = useState("goals");
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ maxWidth: 600, margin: "0 auto" }}>
 
       <div
         style={{
