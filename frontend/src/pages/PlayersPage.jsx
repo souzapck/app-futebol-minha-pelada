@@ -1,5 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { useEffect, useState } from "react";
+import CampoIcon from "../components/icons/CampoIcon";
+
 
 const normalizePhone = (value) => value.replace(/\D/g, "").slice(0, 11);
 
@@ -12,23 +14,24 @@ const formatPhone = (value) => {
 };
 
 const POSITIONS = ["GOL", "ZAG", "LAT", "MEI", "ATA"];
-const INITIAL_FORM = { name: "", rating: 3, position: "MEI", shirt_number: "", phone: "" };
-
+const INITIAL_FORM = {
+  name: "",
+  rating: 3,
+  position: "MEI",
+  shirt_number: "",
+  phone: "",
+  is_spectator: false
+};
 
 export default function PlayersPage({ user }) {
   const [players, setPlayers] = useState([]);
- 
-  // Controle para criação de novo jogador
+
   const [showNewForm, setShowNewForm] = useState(false);
   const [newForm, setNewForm] = useState(INITIAL_FORM);
 
-
-  // Controle para edição (qual ID está sendo editado no momento)
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
 
-
-   // Controle de perfil (Admin ou Jogador)
   const toggleAdmin = async (jogadorId) => {
     const confirma = window.confirm(
       "Deseja dar ou retirar o acesso de Administrador deste jogador?"
@@ -115,8 +118,6 @@ export default function PlayersPage({ user }) {
     }
   };
 
-
-  // Função para o Administrador resetar a senha de qualquer jogador
   const resetarSenha = async (jogadorId, nomeJogador) => {
     const novaSenha = window.prompt(`🔄 Digite a nova senha provisória para ${nomeJogador}:`);
     if (!novaSenha) return;
@@ -198,12 +199,9 @@ export default function PlayersPage({ user }) {
     }
   };
 
-
-
   useEffect(() => {
     loadPlayers();
   }, []);
-
 
   const loadPlayers = async () => {
     try {
@@ -228,7 +226,8 @@ export default function PlayersPage({ user }) {
 
         return {
           ...player,
-          is_admin: Boolean(userMatch?.is_admin)
+          is_admin: Boolean(userMatch?.is_admin),
+          is_spectator: Boolean(player.is_spectator)
         };
       });
 
@@ -238,15 +237,19 @@ export default function PlayersPage({ user }) {
     }
   };
 
-
-  // --- Função para CRIAR Novo Jogador ---
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
 
     const payload = {
       ...newForm,
       phone: newForm.phone ? normalizePhone(newForm.phone) : null,
-      shirt_number: newForm.shirt_number ? parseInt(newForm.shirt_number) : null
+      position: newForm.is_spectator ? null : newForm.position,
+      rating: newForm.is_spectator ? null : newForm.rating,
+      shirt_number: newForm.is_spectator
+        ? null
+        : newForm.shirt_number
+        ? parseInt(newForm.shirt_number)
+        : null
     };
 
     if (payload.phone && payload.phone.length !== 11) {
@@ -301,8 +304,6 @@ export default function PlayersPage({ user }) {
     loadPlayers();
   };
 
-
-  // --- Funções para EDITAR Jogador Existente ---
   const startEdit = (p) => {
     setEditingId(p.id);
     setEditForm({
@@ -310,16 +311,15 @@ export default function PlayersPage({ user }) {
       rating: p.rating,
       position: p.position,
       shirt_number: p.shirt_number || "",
-      phone: p.phone || ""
+      phone: p.phone || "",
+      is_spectator: Boolean(p.is_spectator)
     });
   };
-
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm({});
   };
-
 
   const handleEditSubmit = async (e, playerId) => {
     e.preventDefault();
@@ -329,8 +329,20 @@ export default function PlayersPage({ user }) {
     const payload = {
       ...editForm,
       phone: phoneNormalizado,
-      shirt_number: editForm.shirt_number ? parseInt(editForm.shirt_number) : null
+      shirt_number: editForm.is_spectator
+        ? undefined
+        : editForm.shirt_number
+        ? parseInt(editForm.shirt_number)
+        : null,
+      position: editForm.is_spectator ? undefined : editForm.position,
+      rating: editForm.is_spectator ? undefined : editForm.rating
     };
+
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === undefined) {
+        delete payload[key];
+      }
+    });
 
     if (payload.phone && payload.phone.length !== 11) {
       alert("❌ O telefone deve ter 11 dígitos com DDD.");
@@ -348,7 +360,6 @@ export default function PlayersPage({ user }) {
       return;
     }
 
-    // sincroniza com users, mas só se existir usuário
     const { data: existingUser, error: userFetchError } = await supabase
       .from("users")
       .select("id, player_id")
@@ -365,7 +376,6 @@ export default function PlayersPage({ user }) {
 
     if (existingUser) {
       if (payload.phone) {
-        // se tem telefone, atualiza telefone e redefine senha para os últimos 4 dígitos
         const senhaPadrao = payload.phone.slice(-4);
 
         const { error: updateUserError } = await supabase
@@ -381,7 +391,6 @@ export default function PlayersPage({ user }) {
           alert(`❌ Jogador editado, mas houve erro ao atualizar login: ${updateUserError.message}`);
         }
       } else {
-        // se removeu o telefone, remove também do users
         const { error: updateUserError } = await supabase
           .from("users")
           .update({
@@ -395,7 +404,6 @@ export default function PlayersPage({ user }) {
         }
       }
     } else if (payload.phone) {
-      // se não existe usuário e agora passou a ter telefone, cria login
       const senhaPadrao = payload.phone.slice(-4);
 
       const { error: insertUserError } = await supabase
@@ -419,199 +427,517 @@ export default function PlayersPage({ user }) {
     loadPlayers();
   };
 
-
-  // --- REGRAS DE ORDENAÇÃO DA LISTA DE JOGADORES ---
   const jogadoresOrdenados = [...players].sort((a, b) => {
-    // Regra 1: O usuário logado SEMPRE ganha e vai para o topo absoluto
     if (a.id === user?.player_id) return -1;
     if (b.id === user?.player_id) return 1;
 
-
-    // Regra 2: Os Administradores (🔑) vêm logo em seguida
     if (a.is_admin && !b.is_admin) return -1;
     if (!a.is_admin && b.is_admin) return 1;
 
-
-    // Regra 3: O resto da lista fica em Ordem Alfabética
     return a.name.localeCompare(b.name);
   });
 
-
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
-     
-      {/* Botão Principal: Novo Jogador */}
       {!showNewForm ? (
         <button
           onClick={() => setShowNewForm(true)}
-          style={{ width: "100%", padding: "16px", background: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", border: "none", borderRadius: "10px", cursor: "pointer", marginBottom: 20, boxShadow: "0 4px 10px rgba(0,123,255,0.3)" }}
+          style={{
+            width: "100%",
+            padding: "16px",
+            background: "#28a745",
+            color: "white",
+            fontSize: "16px",
+            fontWeight: "bold",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            marginBottom: 20,
+            boxShadow: "0 4px 10px rgba(0,123,255,0.3)"
+          }}
         >
           ➕ Adicionar Novo Jogador
         </button>
       ) : (
-        /* Formulário de Novo Jogador (só aparece se clicar no botão acima) */
-        <div style={{ background: "#fff", padding: "15px", borderRadius: "12px", border: "2px dashed #007bff", marginBottom: "20px" }}>
+        <div
+          style={{
+            background: "#fff",
+            padding: "15px",
+            borderRadius: "12px",
+            border: "2px dashed #007bff",
+            marginBottom: "20px"
+          }}
+        >
           <h3 style={{ marginTop: 0, color: "#007bff" }}>👥 Novo Jogador</h3>
-          <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div style={{ display: "flex", gap: "200px" }}> 
-              <span style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</span>
-              <span style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</span>
+          <form
+            onSubmit={handleCreateSubmit}
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+          >
+            <div style={{ display: "flex", gap: "200px" }}>
+              <span
+                style={{
+                  textAlign: "left",
+                  paddingLeft: "4px",
+                  fontWeight: "500",
+                  color: "#374151",
+                  fontSize: "12px"
+                }}
+              >
+                👤 Nome *
+              </span>
+              <span style={{ width: "80px", color: "#374151", fontSize: "12px" }}>
+                📱 WhatsApp
+              </span>
             </div>
-            <div style={{ display: "flex", gap: "10px" }}>                                              
-              <input style={{ flex: 1 }} placeholder="Nome *" required value={newForm.name} onChange={e => setNewForm({...newForm, name: e.target.value})} />
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <input
+                style={{ flex: 1 }}
+                placeholder="Nome *"
+                required
+                value={newForm.name}
+                onChange={(e) => setNewForm({ ...newForm, name: e.target.value })}
+              />
               <input
                 placeholder="WhatsApp"
                 type="tel"
                 value={formatPhone(newForm.phone)}
-                onChange={e => setNewForm({ ...newForm, phone: normalizePhone(e.target.value) })}
+                onChange={(e) =>
+                  setNewForm({ ...newForm, phone: normalizePhone(e.target.value) })
+                }
               />
-            </div>            
-            <div style={{ display: "flex", gap: "35px" }}>
-              <span style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</span>
-              <span style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</span>              
-              <span style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</span>
             </div>
-            <div style={{ display: "flex", gap: "50px" }}>
-              <select style={{ flex: 2}}  value={newForm.position} onChange={e => setNewForm({...newForm, position: e.target.value})}>
-                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select> 
-              <input style={{ flex: 2}} type="number" step="0.5" min="0.5" max="5" required value={newForm.rating} onChange={e => setNewForm({...newForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>             
-              <input style={{ width: "70px"}}  placeholder="Nº 👕" type="number" value={newForm.shirt_number} onChange={e => setNewForm({...newForm, shirt_number: e.target.value})} />                            
-              <spam style={{ color: "#374151", fontSize: "12px", width: "70px" }}></spam>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+              <input
+                type="checkbox"
+                checked={newForm.is_spectator}
+                onChange={(e) =>
+                  setNewForm({
+                    ...newForm,
+                    is_spectator: e.target.checked
+                  })
+                }
+              />
+              <span
+                style={{
+                  fontSize: "13px",
+                  color: "#374151",
+                  fontWeight: "500"
+                }}
+              >
+                👀 Apenas espectador
+              </span>
             </div>
+
+            {!newForm.is_spectator && (
+              <>
+                <div style={{ display: "flex", gap: "35px" }}>
+                  <span style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</span>
+                  <span style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</span>
+                  <span style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</span>
+                </div>
+
+                <div style={{ display: "flex", gap: "50px" }}>
+                  <select
+                    style={{ flex: 2 }}
+                    value={newForm.position}
+                    onChange={(e) =>
+                      setNewForm({ ...newForm, position: e.target.value })
+                    }
+                  >
+                    {POSITIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    style={{ flex: 2 }}
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    max="5"
+                    required
+                    value={newForm.rating}
+                    onChange={(e) =>
+                      setNewForm({
+                        ...newForm,
+                        rating: parseFloat(e.target.value) || 0
+                      })
+                    }
+                    title="Estrelas"
+                  />
+
+                  <input
+                    style={{ width: "70px" }}
+                    placeholder="Nº 👕"
+                    type="number"
+                    value={newForm.shirt_number}
+                    onChange={(e) =>
+                      setNewForm({ ...newForm, shirt_number: e.target.value })
+                    }
+                  />
+
+                  <span style={{ color: "#374151", fontSize: "12px", width: "70px" }}></span>
+                </div>
+              </>
+            )}
+
             <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-              <button type="submit" style={{ flex: 1, padding: "12px", background: "#28a745", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Salvar</button>
-              <button type="button" onClick={() => setShowNewForm(false)} style={{ padding: "12px", background: "#6c757d", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Cancelar</button>
+              <button
+                type="submit"
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "#28a745",
+                  color: "white",
+                  fontWeight: "bold",
+                  border: "none",
+                  borderRadius: "8px"
+                }}
+              >
+                Salvar
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNewForm(false)}
+                style={{
+                  padding: "12px",
+                  background: "#6c757d",
+                  color: "white",
+                  fontWeight: "bold",
+                  border: "none",
+                  borderRadius: "8px"
+                }}
+              >
+                Cancelar
+              </button>
             </div>
           </form>
         </div>
       )}
 
-
-      {/* Lista de Jogadores */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "10px"
+        }}
+      >
         <h3 style={{ color: "#504e4e", margin: 0 }}>Elenco</h3>
-        <span style={{ background: "#eee", padding: "4px 10px", borderRadius: "15px", fontSize: "14px", fontWeight: "bold" }}>{players.length}</span>
+        <span
+          style={{
+            background: "#eee",
+            padding: "4px 10px",
+            borderRadius: "15px",
+            fontSize: "14px",
+            fontWeight: "bold"
+          }}
+        >
+          {players.length}
+        </span>
       </div>
-
 
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {jogadoresOrdenados.map(p => {
-            const isMasterAdmin = p.phone === "00000000000";
+        {jogadoresOrdenados.map((p) => {
+          const isMasterAdmin = p.phone === "00000000000";
 
-            return (
-              <div key={p.id} style={{
-                background: "#fff", borderRadius: "10px", borderLeft: "6px solid #667eea", boxShadow: "0 2px 5px rgba(0,0,0,0.05)", overflow: "hidden"
-              }}>
-              
-                {/* Visualização Padrão do Card */}
-                {editingId !== p.id ? (
-                  <div style={{ padding: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: "bold", fontSize: "16px", color: "#333" }}>
-                        {p.shirt_number ? <span style={{ color: "#007bff", marginRight: "5px" }}>#{p.shirt_number}</span> : ""}
-                        {p.name} <span style={{ fontSize: "14px", marginLeft: "4px" }}>{Boolean(p.is_admin) ? "🔑" : "⚽"}</span>                    
-                      </div>
+          return (
+            <div
+              key={p.id}
+              style={{
+                background: "#fff",
+                borderRadius: "10px",
+                borderLeft: "6px solid #667eea",
+                boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                overflow: "hidden"
+              }}
+            >
+              {editingId !== p.id ? (
+                <div
+                  style={{
+                    padding: "15px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: "bold", fontSize: "16px", color: "#333" }}>
+                      {!p.is_spectator && p.shirt_number ? (
+                        <span style={{ color: "#007bff", marginRight: "5px" }}>
+                          #{p.shirt_number}
+                        </span>
+                      ) : (
+                        ""
+                      )}
+                      {p.name}{" "}
+                      <span style={{ fontSize: "14px", marginLeft: "4px" }}>
+                        {p.is_spectator ? "👀" : Boolean(p.is_admin) ? "🔑" : "⚽"}
+                      </span>
+                    </div>
 
-
+                    {p.is_spectator ? (
                       <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
-                        ⚽ {p.position} | ⭐ {p.rating} {p.phone && `| 📱 ${p.phone}`}
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          Espectador
+                        </span>
+                          {p.phone && `📱 ${formatPhone(p.phone)}`}
                       </div>
-                    </div>
-                                
-                    {/* CAIXA DOS BOTÕES (Organiza um em cima do outro na direita) */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", minWidth: "110px" }}>
-                    
-                      {/* BOTÃO DE ADMIN */}
-                      <button
-                        onClick={() => toggleAdmin(p.id)}
-                        disabled={p.id === user.player_id}
-                        style={{
-                            background: p.id === user.player_id ? "#e9ecef" : "#ffffff",
-                            color: p.id === user.player_id ? "#a1a1a1" : "#333",
-                            border: p.id === user.player_id ? "1px solid #ddd" : "1px solid #ccc",
-                            borderRadius: "6px", cursor: p.id === user.player_id ? "not-allowed" : "pointer",
-                            fontSize: "13px", fontWeight: "bold", padding: "6px", width: "100%", textAlign: "center",
-                            boxShadow: p.id !== user.player_id ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
-                        }}
-                      >
-                        {p.id === user.player_id ? "🔒 Você" : p.is_admin ? "🔑 Tirar Admin" : "⚽ Dar Admin"}
-                      </button>                
-                    
-                      {/* NOVO: BOTÃO DE RESETAR SENHA */}
-                      <button
-                        onClick={() => resetarSenha(p.id, p.name)}
-                        style={{
-                          background: "#fff3cd", color: "#856404", border: "1px solid #ffeeba",
-                          padding: "6px", borderRadius: "6px", cursor: "pointer",
-                          fontSize: "13px", fontWeight: "bold", width: "100%", textAlign: "center"
-                        }}
-                      >
-                        🔄 Resetar Senha
-                      </button>
-
-
-                      {/* BOTÃO DE EDITAR */}
-                      <button
-                        onClick={() => startEdit(p)}
-                        style={{
-                          background: "#f8f9fa", color: "#555", border: "1px solid #ddd",
-                          padding: "6px", borderRadius: "6px", cursor: "pointer",
-                          fontSize: "13px", fontWeight: "bold", width: "100%", textAlign: "center"
-                        }}
-                      >
-                        ✏️ Editar
-                      </button>
-
-
-                    </div>
-                    
-                  </div>
-                ) : (
-                
-                  /* Formulário de Edição Expandido (aparece DENTRO do próprio cartão) */
-                  <div style={{ background: "#ffffff", padding: "15px", borderRadius: "12px", border: "2px dashed #0022ff", marginBottom: "0px" }}>
-                    <form onSubmit={(e) => handleEditSubmit(e, p.id)} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      <div style={{ display: "flex", gap: "200px" }}> 
-                        <span style={{textAlign: "left", paddingLeft: "4px", fontWeight: "500", color: "#374151", fontSize: "12px" }}>👤 Nome *</span>
-                        <span style={{width: "80px", color: "#374151", fontSize: "12px" }}>📱 WhatsApp</span>
+                    ) : (
+                      <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          <CampoIcon size={14} />
+                          {p.position}  | ⭐ {p.rating}
+                        </span> {p.phone && `📱 ${formatPhone(p.phone)}`}
                       </div>
-                      <div style={{ display: "flex", gap: "10px" }}>                                      
-                        <input style={{ flex: 1 }} placeholder="Nome *" required value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
-                        <input
-                          placeholder="WhatsApp"
-                          type="tel"
-                          value={formatPhone(editForm.phone)}
-                          onChange={e => setEditForm({ ...editForm, phone: normalizePhone(e.target.value) })}
-                        />
-                      </div>            
-                      <div style={{ display: "flex", gap: "35px" }}>
-                        <span style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</span>
-                        <span style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</span>              
-                        <span style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</span>
-                      </div>
-                      <div style={{ display: "flex", gap: "35px" }}>
-                        <select style={{ flex: 2}}  value={editForm.position} onChange={e => setEditForm({...editForm, position: e.target.value})}>
-                          {POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-                        </select> 
-                        <input style={{ flex: 2}} type="number" step="0.5" min="0.5" max="5" required value={editForm.rating} onChange={e => setEditForm({...editForm, rating: parseFloat(e.target.value) || 0})} title="Estrelas"/>            
-                        <input style={{ width: "70px"}}  placeholder="Nº 👕" type="number" value={editForm.shirt_number} onChange={e => setEditForm({...editForm, shirt_number: e.target.value})} />                            
-                        <span style={{ color: "#374151", fontSize: "12px", width: "70px" }}></span>
-                      </div>
-                      <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                        <button type="submit" style={{ flex: 1, padding: "12px", background: "#0022ff", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Salvar Edição</button>
-                        <button type="button" onClick={cancelEdit} style={{ padding: "12px", background: "#6c757d", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px" }}>Cancelar</button>
-                      </div>
-                    </form>
+                    )}
                   </div>
 
-                )}
-              </div>
-            );
-          })}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                      alignItems: "stretch",
+                      minWidth: "110px"
+                    }}
+                  >
+                    <button
+                      onClick={() => toggleAdmin(p.id)}
+                      disabled={p.id === user.player_id}
+                      style={{
+                        background: p.id === user.player_id ? "#e9ecef" : "#ffffff",
+                        color: p.id === user.player_id ? "#a1a1a1" : "#333",
+                        border: p.id === user.player_id ? "1px solid #ddd" : "1px solid #ccc",
+                        borderRadius: "6px",
+                        cursor: p.id === user.player_id ? "not-allowed" : "pointer",
+                        fontSize: "13px",
+                        fontWeight: "bold",
+                        padding: "6px",
+                        width: "100%",
+                        textAlign: "center",
+                        boxShadow:
+                          p.id !== user.player_id ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
+                      }}
+                    >
+                      {p.id === user.player_id
+                        ? "🔒 Você"
+                        : p.is_admin
+                        ? "🔑 Tirar Admin"
+                        : "⚽ Dar Admin"}
+                    </button>
+
+                    <button
+                      onClick={() => resetarSenha(p.id, p.name)}
+                      style={{
+                        background: "#fff3cd",
+                        color: "#856404",
+                        border: "1px solid #ffeeba",
+                        padding: "6px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: "bold",
+                        width: "100%",
+                        textAlign: "center"
+                      }}
+                    >
+                      🔄 Resetar Senha
+                    </button>
+
+                    <button
+                      onClick={() => startEdit(p)}
+                      style={{
+                        background: "#f8f9fa",
+                        color: "#555",
+                        border: "1px solid #ddd",
+                        padding: "6px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: "bold",
+                        width: "100%",
+                        textAlign: "center"
+                      }}
+                    >
+                      ✏️ Editar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    background: "#ffffff",
+                    padding: "15px",
+                    borderRadius: "12px",
+                    border: "2px dashed #0022ff",
+                    marginBottom: "0px"
+                  }}
+                >
+                  <form
+                    onSubmit={(e) => handleEditSubmit(e, p.id)}
+                    style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+                  >
+                    <div style={{ display: "flex", gap: "200px" }}>
+                      <span
+                        style={{
+                          textAlign: "left",
+                          paddingLeft: "4px",
+                          fontWeight: "500",
+                          color: "#374151",
+                          fontSize: "12px"
+                        }}
+                      >
+                        👤 Nome *
+                      </span>
+                      <span style={{ width: "80px", color: "#374151", fontSize: "12px" }}>
+                        📱 WhatsApp
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <input
+                        style={{ flex: 1 }}
+                        placeholder="Nome *"
+                        required
+                        value={editForm.name}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, name: e.target.value })
+                        }
+                      />
+                      <input
+                        placeholder="WhatsApp"
+                        type="tel"
+                        value={formatPhone(editForm.phone)}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            phone: normalizePhone(e.target.value)
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editForm.is_spectator)}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            is_spectator: e.target.checked
+                          })
+                        }
+                      />
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          color: "#374151",
+                          fontWeight: "500"
+                        }}
+                      >
+                        👀 Apenas espectador
+                      </span>
+                    </div>
+
+                    {!editForm.is_spectator && (
+                      <>
+                        <div style={{ display: "flex", gap: "35px" }}>
+                          <span style={{ color: "#374151", fontSize: "12px" }}>⚽ Posição *</span>
+                          <span style={{ color: "#374151", fontSize: "12px" }}>⭐ Classificação *</span>
+                          <span style={{ color: "#374151", fontSize: "12px" }}>👕 Camisa Nº</span>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "35px" }}>
+                          <select
+                            style={{ flex: 2 }}
+                            value={editForm.position}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, position: e.target.value })
+                            }
+                          >
+                            {POSITIONS.map((pos) => (
+                              <option key={pos} value={pos}>
+                                {pos}
+                              </option>
+                            ))}
+                          </select>
+
+                          <input
+                            style={{ flex: 2 }}
+                            type="number"
+                            step="0.5"
+                            min="0.5"
+                            max="5"
+                            required
+                            value={editForm.rating}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                rating: parseFloat(e.target.value) || 0
+                              })
+                            }
+                            title="Estrelas"
+                          />
+
+                          <input
+                            style={{ width: "70px" }}
+                            placeholder="Nº 👕"
+                            type="number"
+                            value={editForm.shirt_number}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                shirt_number: e.target.value
+                              })
+                            }
+                          />
+                          <span style={{ color: "#374151", fontSize: "12px", width: "70px" }}></span>
+                        </div>
+                      </>
+                    )}
+
+                    <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                      <button
+                        type="submit"
+                        style={{
+                          flex: 1,
+                          padding: "12px",
+                          background: "#0022ff",
+                          color: "white",
+                          fontWeight: "bold",
+                          border: "none",
+                          borderRadius: "8px"
+                        }}
+                      >
+                        Salvar Edição
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        style={{
+                          padding: "12px",
+                          background: "#6c757d",
+                          color: "white",
+                          fontWeight: "bold",
+                          border: "none",
+                          borderRadius: "8px"
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-
-
     </div>
   );
 }

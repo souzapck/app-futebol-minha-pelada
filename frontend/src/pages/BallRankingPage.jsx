@@ -155,9 +155,9 @@ export default function BallRankingPage() {
         <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
           <thead>
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #ddd", color: "#444" }}>
-              <th style={{ padding: "15px 10px", width: "50px", textAlign: "center" }}>Pos</th>
-              <th style={{ padding: "15px 10px" }}>Jogador</th>
-              <th style={{ padding: "15px 10px", textAlign: "center", color: corNumero }}>
+              <th style={{ padding: "15px 10px", width: "12%", textAlign: "center" }}>Pos</th>
+              <th style={{ padding: "15px 10px", width: "55%"}}>Jogador  </th>
+              <th style={{ padding: "15px 10px", width: "33%", textAlign: "center", color: corNumero }}>
                 {colunaFinal}
               </th>
             </tr>

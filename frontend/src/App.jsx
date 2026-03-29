@@ -15,7 +15,7 @@ function App() {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const SESSION_DURATION = 2 * 60 * 60 * 1000; // 2 horas
-  const IDLE_LIMIT = 15 * 60 * 1000; // 15 minutos
+  const IDLE_LIMIT = 60 * 60 * 1000; // 60 minutos
 
   const renovarSessao = () => {
     const session = localStorage.getItem("session");
@@ -135,7 +135,7 @@ function App() {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "20px",
-          background: "#fff",
+          background: "#e0dddd",
           padding: "10px 15px",
           borderRadius: "8px",
           boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
