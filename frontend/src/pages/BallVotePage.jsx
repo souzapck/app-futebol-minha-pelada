@@ -671,7 +671,7 @@ export default function BallVotePage({ user }) {
                       {voteSummary.cheiaRanking.length > 0 && (
                         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                           {voteSummary.cheiaRanking.map((p, index) => (
-                            <div key={p.id} style={{ marginLeft: "20px", textAlign: "left", fontSize: "14px", color: "#444" }}>
+                            <div key={p.id} style={{ marginLeft: "15px", textAlign: "left", fontSize: "12px", color: "#444" }}>
                               <strong>{index + 1}.</strong> {formatPlayerLine(p)} — {p.votes} voto(s)
                             </div>
                           ))}
@@ -711,7 +711,7 @@ export default function BallVotePage({ user }) {
                       {voteSummary.murchaRanking.length > 0 && (
                         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                           {voteSummary.murchaRanking.map((p, index) => (
-                            <div key={p.id} style={{marginLeft: "20px", textAlign: "left", fontSize: "14px", color: "#444" }}>
+                            <div key={p.id} style={{marginLeft: "15px", textAlign: "left", fontSize: "12px", color: "#444" }}>
                               <strong>{index + 1}.</strong> {formatPlayerLine(p)} — {p.votes} voto(s)
                             </div>
                           ))}
