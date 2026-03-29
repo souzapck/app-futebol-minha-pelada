@@ -6,31 +6,7 @@ export default function RankingPage() {
   const [subView, setSubView] = useState("goals");
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", paddingBottom: "40px" }}>
-      {/*<div
-        style={{
-          background: "#fff",
-          borderRadius: "12px",
-          padding: "20px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          border: "1px solid #eee",
-          marginBottom: "20px"
-        }}
-      >
-        <h2 style={{ margin: 0, color: "#333", textAlign: "center" }}>
-          🏆 Ranking
-        </h2>
-        <p
-          style={{
-            margin: "8px 0 0 0",
-            color: "#666",
-            textAlign: "center",
-            fontSize: "14px"
-          }}
-        >
-          Escolha o ranking que deseja visualizar.
-        </p>
-      </div>*/}
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
 
       <div
         style={{
@@ -70,10 +46,42 @@ export default function RankingPage() {
         >
           ⚽ Bola Cheia / 🎈 Bola Murcha
         </button>
+
+        <button
+          onClick={() => setSubView("points")}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "20px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold",
+            background: subView === "points" ? "#007bff" : "#eee",
+            color: subView === "points" ? "white" : "#333"
+          }}
+        >
+          📊 Pontuação
+        </button>
+
       </div>
 
       {subView === "goals" && <GoalsRankingPage />}
       {subView === "ball" && <BallRankingPage />}
+
+      {subView === "points" && (
+        <div style={{
+          background: "#fff",
+          padding: "20px",
+          borderRadius: "10px",
+          border: "1px solid #ddd",
+          textAlign: "center"
+        }}>
+          <h3 style={{ marginTop: 0 }}>📊 Pontuação</h3>
+          <p style={{ color: "#666" }}>
+            Em breve você verá aqui o ranking por pontuação geral dos jogadores.
+          </p>
+        </div>
+      )}
+      
     </div>
   );
 }

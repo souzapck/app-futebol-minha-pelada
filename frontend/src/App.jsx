@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import PlayersPage from "./pages/PlayersPage.jsx";
 import MatchesPage from "./pages/MatchesPage.jsx";
 import TeamsPage from "./pages/TeamsPage.jsx";
@@ -14,35 +14,44 @@ function App() {
   const [user, setUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const SESSION_DURATION = 2 * 60 * 60 * 1000; // 2 horas
-  const IDLE_LIMIT = 60 * 60 * 1000; // 60 minutos
+  const SESSION_DURATION = 10 * 60 * 1000; // 10 minutos
 
   const renovarSessao = () => {
     const session = localStorage.getItem("session");
     if (!session) return;
 
-    const parsed = JSON.parse(session);
+    try {
+      const parsed = JSON.parse(session);
 
-    const novaSession = {
-      ...parsed,
-      expiresAt: Date.now() + SESSION_DURATION,
-      lastActivityAt: Date.now()
-    };
+      const novaSession = {
+        ...parsed,
+        expiresAt: Date.now() + SESSION_DURATION,
+        lastActivityAt: Date.now()
+      };
 
-    localStorage.setItem("session", JSON.stringify(novaSession));
+      localStorage.setItem("session", JSON.stringify(novaSession));
+    } catch (error) {
+      console.error("Erro ao renovar sessão:", error);
+    }
   };
 
   useEffect(() => {
     const session = localStorage.getItem("session");
 
     if (session) {
-      const parsed = JSON.parse(session);
+      try {
+        const parsed = JSON.parse(session);
 
-      if (Date.now() > parsed.expiresAt) {
+        if (Date.now() > parsed.expiresAt) {
+          localStorage.removeItem("session");
+          setUser(null);
+        } else {
+          setUser(parsed.user);
+        }
+      } catch (error) {
+        console.error("Erro ao ler sessão:", error);
         localStorage.removeItem("session");
         setUser(null);
-      } else {
-        setUser(parsed.user);
       }
     }
   }, []);
@@ -51,19 +60,59 @@ function App() {
     const interval = setInterval(() => {
       const session = localStorage.getItem("session");
 
-      if (session) {
+      if (!session) return;
+
+      try {
         const parsed = JSON.parse(session);
 
         if (Date.now() > parsed.expiresAt) {
           alert("⏱️ Sessão expirada. Faça login novamente.");
           localStorage.removeItem("session");
           setUser(null);
+          setShowUserMenu(false);
         }
+      } catch (error) {
+        console.error("Erro ao validar sessão:", error);
+        localStorage.removeItem("session");
+        setUser(null);
+        setShowUserMenu(false);
       }
-    }, 60000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let throttleTimeout = null;
+
+    const handleActivity = () => {
+      if (throttleTimeout) return;
+
+      renovarSessao();
+
+      throttleTimeout = setTimeout(() => {
+        throttleTimeout = null;
+      }, 30000);
+    };
+
+    const events = ["click", "keydown", "mousemove", "touchstart"];
+
+    events.forEach((event) => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, handleActivity);
+      });
+
+      if (throttleTimeout) {
+        clearTimeout(throttleTimeout);
+      }
+    };
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -83,8 +132,8 @@ function App() {
     const novaSenha = window.prompt("🔑 Digite a sua nova senha:");
     if (!novaSenha) return;
 
-    if (novaSenha.length !== 4) {
-      alert("❌ A senha deve ter exatamente 4 dígitos.");
+    if (!/^\d{4}$/.test(novaSenha)) {
+      alert("❌ A senha deve ter exatamente 4 dígitos numéricos.");
       return;
     }
 
@@ -105,11 +154,17 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem("session");
     setUser(null);
+    setShowUserMenu(false);
   };
 
   const handleChangeView = (nextView) => {
     setShowUserMenu(false);
     setView(nextView);
+    renovarSessao();
+  };
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
   };
 
   if (!user) {
@@ -119,23 +174,36 @@ function App() {
           <img
             src="/image.jpg"
             alt="Futebol de Quinta"
-            style={{ width: "150px", height: "auto", objectFit: "contain", borderRadius: "10px" }}
+            style={{
+              width: "150px",
+              height: "auto",
+              objectFit: "contain",
+              borderRadius: "10px"
+            }}
           />
         </div>
-        <LoginPage onLoginSuccess={(dados) => setUser(dados)} />
+
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+    <div
+      style={{
+        padding: 20,
+        maxWidth: 900,
+        margin: "0 auto",
+        fontFamily: "Arial, sans-serif"
+      }}
+    >
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "20px",
-          background: "#e0dddd",
+          background: "#fff",
           padding: "10px 15px",
           borderRadius: "8px",
           boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
@@ -163,7 +231,9 @@ function App() {
           </div>
 
           <div>
-            <div style={{ fontWeight: "bold", color: "#333" }}>{user?.players?.name}</div>
+            <div style={{ fontWeight: "bold", color: "#333" }}>
+              {user?.players?.name}
+            </div>
             <div
               style={{
                 fontSize: "12px",
@@ -181,6 +251,7 @@ function App() {
             onClick={(e) => {
               e.stopPropagation();
               setShowUserMenu((prev) => !prev);
+              renovarSessao();
             }}
             style={{
               background: "#f8f9fa",
@@ -235,7 +306,6 @@ function App() {
 
               <button
                 onClick={() => {
-                  setShowUserMenu(false);
                   handleLogout();
                 }}
                 style={{
@@ -260,7 +330,12 @@ function App() {
         <img
           src="/image.jpg"
           alt="Futebol de Quinta"
-          style={{ width: "180px", height: "auto", objectFit: "contain", borderRadius: "10px" }}
+          style={{
+            width: "180px",
+            height: "auto",
+            objectFit: "contain",
+            borderRadius: "10px"
+          }}
         />
       </div>
 
