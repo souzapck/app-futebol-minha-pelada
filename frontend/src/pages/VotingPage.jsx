@@ -6,30 +6,6 @@ export default function VotingPage({ user }) {
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
-      {/*<div
-        style={{
-          background: "#fff",
-          borderRadius: "12px",
-          padding: "20px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          border: "1px solid #eee",
-          marginBottom: "20px"
-        }}
-      >
-        <h2 style={{ margin: 0, color: "#333", textAlign: "center" }}>
-          🗳️ Votação
-        </h2>
-        <p
-          style={{
-            margin: "8px 0 0 0",
-            color: "#666",
-            textAlign: "center",
-            fontSize: "14px"
-          }}
-        >
-          Escolha uma funcionalidade de votação abaixo.
-        </p>
-      </div>*/}
 
       <div
         style={{
@@ -43,12 +19,12 @@ export default function VotingPage({ user }) {
         <button
           onClick={() => setSubView("bola")}
           style={{
-            padding: "10px 18px",
+            padding: "10px 16px",
             borderRadius: "20px",
             border: "none",
             cursor: "pointer",
             fontWeight: "bold",
-            background: subView === "bola" ? "#28a745" : "#eee",
+            background: subView === "bola" ? "#007bff" : "#eee",
             color: subView === "bola" ? "white" : "#333"
           }}
         >
@@ -58,12 +34,12 @@ export default function VotingPage({ user }) {
         <button
           onClick={() => setSubView("estrelas")}
           style={{
-            padding: "10px 18px",
+            padding: "10px 16px",
             borderRadius: "20px",
             border: "none",
             cursor: "pointer",
             fontWeight: "bold",
-            background: subView === "estrelas" ? "#28a745" : "#eee",
+            background: subView === "estrelas" ? "#007bff" : "#eee",
             color: subView === "estrelas" ? "white" : "#333"
           }}
         >

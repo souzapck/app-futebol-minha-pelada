@@ -1,6 +1,7 @@
 import { useState } from "react";
 import GoalsRankingPage from "./GoalsRankingPage.jsx";
 import BallRankingPage from "./BallRankingPage.jsx";
+import PointsRankingPage from "./PointsRankingPage";
 
 export default function RankingPage() {
   const [subView, setSubView] = useState("goals");
@@ -20,12 +21,12 @@ export default function RankingPage() {
         <button
           onClick={() => setSubView("goals")}
           style={{
-            padding: "10px 18px",
+            padding: "10px 16px",
             borderRadius: "20px",
             border: "none",
             cursor: "pointer",
             fontWeight: "bold",
-            background: subView === "goals" ? "#28a745" : "#eee",
+            background: subView === "goals" ? "#007bff" : "#eee",
             color: subView === "goals" ? "white" : "#333"
           }}
         >
@@ -35,12 +36,12 @@ export default function RankingPage() {
         <button
           onClick={() => setSubView("ball")}
           style={{
-            padding: "10px 18px",
+            padding: "10px 16px",
             borderRadius: "20px",
             border: "none",
             cursor: "pointer",
             fontWeight: "bold",
-            background: subView === "ball" ? "#28a745" : "#eee",
+            background: subView === "ball" ? "#007bff" : "#eee",
             color: subView === "ball" ? "white" : "#333"
           }}
         >
@@ -66,21 +67,7 @@ export default function RankingPage() {
 
       {subView === "goals" && <GoalsRankingPage />}
       {subView === "ball" && <BallRankingPage />}
-
-      {subView === "points" && (
-        <div style={{
-          background: "#fff",
-          padding: "20px",
-          borderRadius: "10px",
-          border: "1px solid #ddd",
-          textAlign: "center"
-        }}>
-          <h3 style={{ marginTop: 0 }}>📊 Pontuação</h3>
-          <p style={{ color: "#666" }}>
-            Em breve você verá aqui o ranking por pontuação geral dos jogadores.
-          </p>
-        </div>
-      )}
+      {subView === "points" && <PointsRankingPage />}
       
     </div>
   );
