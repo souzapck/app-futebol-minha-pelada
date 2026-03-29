@@ -268,7 +268,6 @@ export default function PointsRankingPage() {
         }}
       >
         <h2 style={{ margin: 0, fontSize: "18px" }}>{titleText}</h2>
-
       </div>
 
       <div
