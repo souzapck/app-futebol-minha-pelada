@@ -1147,7 +1147,7 @@ export default function TeamsPage({ user }) {
             key={m.id}
             onClick={() => loadMatchData(m)}
             style={{
-              minWidth: "120px",
+              minWidth: "110px",
               padding: "10px",
               borderRadius: "8px",
               cursor: "pointer",

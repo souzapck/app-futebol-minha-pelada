@@ -7,7 +7,7 @@ export default function RankingPage() {
   const [subView, setSubView] = useState("goals");
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+    <div style={{ maxWidth: 320, margin: "0 auto" }}>
 
       <div
         style={{
@@ -45,7 +45,7 @@ export default function RankingPage() {
             color: subView === "ball" ? "white" : "#333"
           }}
         >
-          ⚽ Bola Cheia / 🎈 Bola Murcha
+          ⚽ Bola Cheia/Murcha 🎈
         </button>
 
         <button

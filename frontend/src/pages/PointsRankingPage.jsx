@@ -255,7 +255,7 @@ export default function PointsRankingPage() {
   }, [mode, matches, selectedMatchId]);
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
+    <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}> 
       <div
         style={{
           background: "linear-gradient(135deg, #1565c0 0%, #1e88e5 100%)",
