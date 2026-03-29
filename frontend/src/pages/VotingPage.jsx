@@ -28,7 +28,7 @@ export default function VotingPage({ user }) {
             color: subView === "bola" ? "white" : "#333"
           }}
         >
-          ⚽ Bola cheia / 🎈 Bola murcha
+          ⚽ Bola Cheia/Murcha 🎈
         </button>
 
         <button
