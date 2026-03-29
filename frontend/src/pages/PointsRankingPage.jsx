@@ -372,7 +372,7 @@ export default function PointsRankingPage() {
               width: "100%",
               borderCollapse: "collapse",
               textAlign: "left",
-              fontSize: "13px"
+              fontSize: "11px"
             }}
           >
             <thead>
@@ -417,7 +417,7 @@ export default function PointsRankingPage() {
                     {getPosLabel(index)}
                   </td>
 
-                  <td style={{ padding: "10px 6px", color: "#333", minWidth: "120px" }}>
+                  <td style={{  color: "#333", minWidth: "100px" }}>
                     <div style={{ display: "flex", flexDirection: "column" }}>
                       <span>
                         <span style={{ color: "#007bff", marginRight: "5px" }}>

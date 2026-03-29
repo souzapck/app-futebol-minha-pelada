@@ -91,7 +91,7 @@ export default function RankingPage() {
         style={{
           
           background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
-          padding: "20px",
+          padding: "10px",
           borderRadius: "12px",
           color: "white",
           textAlign: "center",
@@ -130,15 +130,15 @@ export default function RankingPage() {
             border: "1px solid #eee"
           }}
         >
-          <table style={{ minWidth: "120px", width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <table style={{ minWidth: "100px", width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
               <tr style={{ fontSize: "14px" ,background: "#f8f9fa", borderBottom: "2px solid #ddd", color: "#444" }}>
-                <th style={{ padding: "15px 10px", width: "10%", textAlign: "center" }}>Pos</th>
-                <th style={{ padding: "15px 10px", width: "50%" }}>Jogador</th>
-                <th style={{ padding: "15px 10px", width: "10%",textAlign: "center" }}>Jogos</th>
-                <th style={{ padding: "15px 10px", width: "10%", textAlign: "center" }}>Média</th>
-                <th style={{ padding: "15px 10px", width: "10%", textAlign: "center", color: "#28a745" }}>Gols P</th>
-                <th style={{ padding: "15px 10px", width: "10%", textAlign: "center", color: "#a80303" }}>Gols C</th>
+                <th style={{ padding: "10px 6px", textAlign: "center" }}>Pos</th>
+                <th style={{ padding: "10px 6px", }}>Jogador</th>
+                <th style={{ padding: "10px 6px", textAlign: "center", color: "#28a745" }}>Gols P</th>
+                <th style={{ padding: "10px 6px", textAlign: "center", color: "#a80303" }}>Gols C</th>
+                <th style={{ padding: "10px 6px", textAlign: "center" }}>Jogos</th>
+                <th style={{ padding: "10px 6px", textAlign: "center" }}>Média</th>
               </tr>
             </thead>
             <tbody>
@@ -153,7 +153,7 @@ export default function RankingPage() {
                 >
                   <td
                     style={{
-                      padding: "15px 10px",
+                      padding: "10px 6px",
                       textAlign: "center",
                       fontWeight: "bold",
                       fontSize: index < 3 ? "20px" : "14px",
@@ -165,10 +165,10 @@ export default function RankingPage() {
 
                   <td
                     style={{
-                      padding: "15px 10px",
+                      padding: "10px 6px",
                       fontWeight: index === 0 ? "bold" : "normal",
-                      color: "#333",
-                      width: "50%"
+                      color: "#333"
+                      //width: "50%"
                     }}
                   >
                     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -184,24 +184,9 @@ export default function RankingPage() {
                     </div>
                   </td>
 
-                  <td style={{ padding: "15px 10px", fontSize: "12px", textAlign: "center", color: "#666" }}>
-                    {jogador.jogos}
-                  </td>
-
                   <td
                     style={{
-                      padding: "15px 10px",
-                      textAlign: "center",
-                      color: "#666",
-                      fontSize: "12px"
-                    }}
-                  >
-                    {jogador.media}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "15px 10px",
+                      padding: "10px 6px",
                       textAlign: "center",
                       fontWeight: "bold",
                       fontSize: "14px",
@@ -213,7 +198,7 @@ export default function RankingPage() {
 
                   <td
                     style={{
-                      padding: "15px 10px",
+                      padding: "10px 6px",
                       textAlign: "center",
                       fontWeight: "bold",
                       fontSize: "14px",
@@ -222,6 +207,22 @@ export default function RankingPage() {
                   >
                     {jogador.golsContra}
                   </td>
+
+                  <td style={{ padding: "10px 6px", fontSize: "12px", textAlign: "center", color: "#666" }}>
+                    {jogador.jogos}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "10px 6px",
+                      textAlign: "center",
+                      color: "#666",
+                      fontSize: "12px"
+                    }}
+                  >
+                    {jogador.media}
+                  </td>
+                                    
                 </tr>
               ))}
             </tbody>
