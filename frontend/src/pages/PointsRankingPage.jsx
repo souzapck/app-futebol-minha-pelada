@@ -7,6 +7,9 @@ export default function PointsRankingPage() {
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [ranking, setRanking] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredPlayerId, setHoveredPlayerId] = useState(null);
+  const [hoveredCell, setHoveredCell] = useState(null);
+
 
   useEffect(() => {
     loadBaseData();
@@ -160,20 +163,21 @@ export default function PointsRankingPage() {
             (team === "B" && scoreB > scoreA);
 
           if (venceu) {
-            row.V += 3; // já em pontos
-            row.PT += 3;
+            row.V += 1; // quantidade vitoria
+            row.PT += 3; // pontos por vitória
           } else {
-            row.D += 0; // já em pontos
+            row.D += 1; // tabela mostra em quantidade vitória
           }
         }
 
         const golsPro = Number(item.goals) || 0;
         const golsContra = Number(item.own_goals) || 0;
 
-        row.GP += golsPro; // 1 ponto por gol
-        row.GC += golsContra * -1; // já negativo
-        row.PT += golsPro;
-        row.PT -= golsContra;
+        row.GP += golsPro;
+        row.GC += golsContra;
+
+        row.PT += golsPro * 0.2;
+        row.PT -= golsContra * 0.2;
       });
 
       const votes = votesByMatch[match.id] || [];
@@ -199,8 +203,8 @@ export default function PointsRankingPage() {
         if (total === maxCheia && maxCheia > 0) {
           const row = ensurePlayer(Number(playerId));
           if (!row) return;
-          row.BC += 3; // já em pontos
-          row.PT += 3;
+          row.BC += 1; // mostra na tabela qtd de bola cheia
+          row.PT += 0.5;  // soma 0,5 a cada bola cheia
         }
       });
 
@@ -208,8 +212,8 @@ export default function PointsRankingPage() {
         if (total === maxMurcha && maxMurcha > 0) {
           const row = ensurePlayer(Number(playerId));
           if (!row) return;
-          row.BM += -1; // já em pontos
-          row.PT -= 1;
+          row.BM += 1; // mostra na tabela qtd de bola murcha
+          row.PT -= 0.5;  // diminui 0,5 a cada bola murcha
         }
       });
     });
@@ -230,7 +234,7 @@ export default function PointsRankingPage() {
       if (b.PT !== a.PT) return b.PT - a.PT;
       if (b.V !== a.V) return b.V - a.V;
       if (b.GP !== a.GP) return b.GP - a.GP;
-      if (b.GC !== a.GC) return b.GC - a.GC;
+      if (a.GC !== b.GC) return a.GC - b.GC;
       return a.name.localeCompare(b.name);
     });
 
@@ -253,6 +257,193 @@ export default function PointsRankingPage() {
 
     return `📊 Pontuação da Rodada (${selected.date.split("-").reverse().join("/")})`;
   }, [mode, matches, selectedMatchId]);
+
+  const calcBreakdown = (jogador) => {
+    return {
+      V: jogador.V * 3,
+      E: jogador.E * 1,
+      D: jogador.D * 0,
+      GP: jogador.GP * 0.2,
+      GC: jogador.GC * -0.2,
+      BC: jogador.BC * 0.5,
+      BM: jogador.BM * -0.5
+    };
+  };
+
+  //aqui monta função para popup apenas da coluna PT
+  const renderPointsTooltipPT = (jogador) => {
+    //const { vPts, ePts, dPts, gpPts, gcPts, bcPts, bmPts } = calcBreakdown(jogador);
+    const breakdown = calcBreakdown(jogador);
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          bottom: "125%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#1f2937",
+          color: "white",
+          padding: "6px 8px",
+          borderRadius: "8px",
+          fontSize: "9px",
+          lineHeight: "1.5",
+          whiteSpace: "nowrap",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+          zIndex: 20,
+          minWidth: "180px",
+          textAlign: "left"
+        }}
+      >
+        <div> 
+          <strong>
+             Contagem de pontos por categoria:
+           </strong>
+        </div>
+        <div> 
+          <strong>
+             V  | E | D | {" "}G.P.{""} | {""}G.C.{""} | {""}B.C.{""} | {""}B.M.{""} 
+           </strong>
+        </div>
+        <hr style={{ borderColor: "rgba(255,255,255,0.2)", margin: "2px 0" }} />
+        <div>
+          <strong>
+            {V} | {E} | {D} | {GP.toFixed(2)} | {GC.toFixed(2)} | {BC.toFixed(2)} | {BM.toFixed(2)}
+          </strong>
+        </div>
+      </div>
+    );
+  };
+  
+
+
+  //aqui monta função para popup das colunas de pontuação
+  const renderColumnTooltip = (jogador, column) => {
+    const breakdown = calcBreakdown(jogador);
+
+    const config = {
+      V: {
+        label: "Vitórias",
+        qty: jogador.V,
+        weight: 3,
+        points: breakdown.V
+      },
+      E: {
+        label: "Empates",
+        qty: jogador.E,
+        weight: 1,
+        points: breakdown.E
+      },
+      D: {
+        label: "Derrotas",
+        qty: jogador.D,
+        weight: 0,
+        points: breakdown.D
+      },
+      GP: {
+        label: "Gols Pró",
+        qty: jogador.GP,
+        weight: 0.2,
+        points: breakdown.GP
+      },
+      GC: {
+        label: "Gols Contra",
+        qty: jogador.GC,
+        weight: -0.2,
+        points: breakdown.GC
+      },
+      BC: {
+        label: "Bola Cheia",
+        qty: jogador.BC,
+        weight: 0.5,
+        points: breakdown.BC
+      },
+      BM: {
+        label: "Bola Murcha",
+        qty: jogador.BM,
+        weight: -0.5,
+        points: breakdown.BM
+      },
+      PT: {
+        label: "Pontuação Total",
+        qty: null,
+        weight: null,
+        points: jogador.PT
+      }
+    };
+
+    const item = config[column];
+    if (!item) return null;
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          bottom: "125%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#1f2937",
+          color: "white",
+          padding: "6px 8px",
+          borderRadius: "8px",
+          fontSize: "9px",
+          lineHeight: "1.5",
+          whiteSpace: "nowrap",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+          zIndex: 20,
+          minWidth: "180px",
+          textAlign: "left"
+        }}
+      >
+        <div><strong>{column}</strong> = {item.label}</div>
+
+        {column !== "PT" ? (
+          <>
+            <div>
+              {item.qty} x {String(item.weight).replace(".", ",")} = {item.points.toFixed(1)}
+            </div>
+            <hr style={{ borderColor: "rgba(255,255,255,0.2)", margin: "6px 0" }} />
+            <div><strong>{item.points.toFixed(2)} ponto(s)</strong></div>
+          </>
+        ) : (
+          <>
+            <div>V = {breakdown.V} | E = {breakdown.E} | D = {breakdown.D} |
+                 GP = {breakdown.GP.toFixed(2)}| GC = {breakdown.GC.toFixed(2)} |
+                 BC = {breakdown.BC.toFixed(2)} | BM = {breakdown.BM.toFixed(2)}
+            </div>
+            <hr style={{ borderColor: "rgba(255,255,255,0.2)", margin: "6px 0" }} />
+            <div><strong>{jogador.PT.toFixed(2)} ponto(s)</strong></div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+    const renderHoverCell = (jogador, column, displayValue, textColor = "#333") => {
+      const isOpen =
+        hoveredCell?.playerId === jogador.id && hoveredCell?.column === column;
+
+      return (
+        <div
+          style={{ position: "relative", display: "inline-block" }}
+          onMouseEnter={() => setHoveredCell({ playerId: jogador.id, column })}
+          onMouseLeave={() => setHoveredCell(null)}
+        >
+          <span
+            style={{
+              cursor: "help",
+              borderBottom: "1px dotted #999",
+              color: textColor,
+              fontWeight: "bold"
+            }}
+          >
+            {displayValue}
+          </span>
+
+          {isOpen && renderColumnTooltip(jogador, column)}
+        </div>
+      );
+    };
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}> 
@@ -358,119 +549,171 @@ export default function PointsRankingPage() {
           Nenhum dado encontrado.
         </div>
       ) : (
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "12px",
-            overflowX: "auto",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-            border: "1px solid #eee"
-          }}
-        >
-          <table
+        <>
+          <div
             style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              textAlign: "left",
-              fontSize: "11px"
+              background: "#fff",
+              borderRadius: "12px",
+              overflowX: "auto",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+              border: "1px solid #eee"
             }}
           >
-            <thead>
-              <tr
-                style={{
-                  background: "#f8f9fa",
-                  borderBottom: "2px solid #ddd",
-                  color: "#444"
-                }}
-              >
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>Pos</th>
-                <th style={{ padding: "10px 6px" }}>Jogador</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>PT</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>V</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>E</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>D</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>GP</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>GC</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>BC</th>
-                <th style={{ padding: "10px 6px", textAlign: "center" }}>BM</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {ranking.map((jogador, index) => (
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                textAlign: "left",
+                fontSize: "13px"
+              }}
+            >
+              <thead>
                 <tr
-                  key={jogador.id}
                   style={{
-                    borderBottom: "1px solid #eee",
-                    backgroundColor: index === 0 ? "#fffbcc" : "transparent"
+                    background: "#f8f9fa",
+                    borderBottom: "2px solid #ddd",
+                    color: "#444"
                   }}
                 >
-                  <td
-                    style={{
-                      padding: "10px 6px",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      color: "#555",
-                      whiteSpace: "nowrap"
-                    }}
-                  >
-                    {getPosLabel(index)}
-                  </td>
-
-                  <td style={{  color: "#333", minWidth: "100px" }}>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span>
-                        <span style={{ color: "#007bff", marginRight: "5px" }}>
-                          {jogador.shirt_number
-                            ? String(jogador.shirt_number).padStart(2, "0")
-                            : "--"}
-                        </span>
-                        {jogador.name}
-                      </span>
-                      <span style={{ fontSize: "11px", color: "#888" }}>
-                        {jogador.position}
-                      </span>
-                    </div>
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "10px 6px",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      fontSize: "15px",
-                      color: jogador.PT >= 0 ? "#1565c0" : "#dc3545"
-                    }}
-                  >
-                    {jogador.PT}
-                  </td>
-
-                  <td style={{ padding: "10px 6px", textAlign: "center", color: "#2e7d32", fontWeight: "bold" }}>
-                    {jogador.V}
-                  </td>
-                  <td style={{ padding: "10px 6px", textAlign: "center", color: "#6c757d", fontWeight: "bold" }}>
-                    {jogador.E}
-                  </td>
-                  <td style={{ padding: "10px 6px", textAlign: "center", color: "#999", fontWeight: "bold" }}>
-                    {jogador.D}
-                  </td>
-                  <td style={{ padding: "10px 6px", textAlign: "center", color: "#198754", fontWeight: "bold" }}>
-                    {jogador.GP}
-                  </td>
-                  <td style={{ padding: "10px 6px", textAlign: "center", color: "#dc3545", fontWeight: "bold" }}>
-                    {jogador.GC}
-                  </td>
-                  <td style={{ padding: "10px 6px", textAlign: "center", color: "#2e7d32", fontWeight: "bold" }}>
-                    {jogador.BC}
-                  </td>
-                  <td style={{ padding: "10px 6px", textAlign: "center", color: "#8e24aa", fontWeight: "bold" }}>
-                    {jogador.BM}
-                  </td>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>Pos</th>
+                  <th style={{ padding: "10px 6px" }}>Jogador</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>PT</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>V</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>E</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>D</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>GP</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>GC</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>BC</th>
+                  <th style={{ padding: "10px 6px", textAlign: "center" }}>BM</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+                {ranking.map((jogador, index) => (
+                  <tr
+                    key={jogador.id}
+                    style={{
+                      borderBottom: "1px solid #eee",
+                      backgroundColor: index === 0 ? "#fffbcc" : "transparent"
+                    }}
+                  >
+                    <td
+                      style={{
+                        padding: "10px 6px",
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: "#555",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      {getPosLabel(index)}
+                    </td>
+
+                    <td style={{ padding: "10px 6px", color: "#333", minWidth: "120px" }}>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span>
+                          <span style={{ color: "#007bff", marginRight: "5px" }}>
+                            {jogador.shirt_number
+                              ? String(jogador.shirt_number).padStart(2, "0")
+                              : "--"}
+                          </span>
+                          {jogador.name}
+                        </span>
+                        <span style={{ fontSize: "11px", color: "#888" }}>
+                          {jogador.position}
+                        </span>
+                      </div>
+                    </td>
+
+               {/*     <td
+                      style={{
+                        padding: "10px 6px",
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        fontSize: "15px",
+                        color: jogador.PT >= 0 ? "#1565c0" : "#dc3545"
+                      }}
+                    >
+                      <div
+                        style={{ position: "relative", display: "inline-block" }}
+                        onMouseEnter={() => setHoveredPlayerId(jogador.id)}
+                        onMouseLeave={() => setHoveredPlayerId(null)}
+                      >
+                        <span style={{cursor: "help",borderBottom: "1px dotted #999"}}>
+                          {jogador.PT.toFixed(2)}
+                        </span>
+
+                        {hoveredPlayerId === jogador.id && renderPointsTooltipPT(jogador)}
+                      </div>
+                    </td>
+                  */}
+
+                    <td
+                      style={{
+                        padding: "10px 6px",
+                        textAlign: "center",
+                        fontSize: "15px"
+                      }}
+                    >
+                      {renderHoverCell(
+                        jogador,
+                        "PT",
+                        jogador.PT.toFixed(1),
+                        jogador.PT >= 0 ? "#1565c0" : "#dc3545"
+                      )}
+                    </td>  
+
+                    <td style={{ padding: "10px 6px", textAlign: "center" }}>                   
+                      {renderHoverCell(jogador, "V", jogador.V, "#2e7d32")}                                  
+                    </td>
+                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                      {renderHoverCell(jogador, "E", jogador.E, "#6c757d")}
+                    </td>
+                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                      {renderHoverCell(jogador, "D", jogador.D, "#999")}
+                    </td>
+                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                      {renderHoverCell(jogador, "GP", jogador.GP, "#198754")}
+                    </td>
+                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                      {renderHoverCell(jogador, "GC", jogador.GC, "#dc3545")}
+                    </td>
+                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                      {renderHoverCell(jogador, "BC", jogador.BC, "#2e7d32")}
+                    </td>
+                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                      {renderHoverCell(jogador, "BM", jogador.BM, "#8e24aa")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            style={{
+              marginTop: "14px",
+              background: "#f8f9fa",
+              border: "1px solid #dee2e6",
+              borderRadius: "10px",
+              padding: "12px",
+              fontSize: "9px",
+              textAlign: "left",
+              color: "#555",
+              lineHeight: "1.7"
+            }}
+          >
+            <div><strong>Mapa de contagem da pontuação:</strong></div>
+            <div><strong>PT</strong> = Pontos Total, quantidade totatl de pontos do jogador.</div>
+            <div><strong>V</strong> = Vitórias, quantidade de vitórias do jogador, tem peso 3 pontos.</div>
+            <div><strong>E</strong> = Empates, quantidade de empates do jogador, tem peso 1 ponto.</div>
+            <div><strong>D</strong> = Derrotas, quantidade de derrotas do jogador, tem peso 0 ponto.</div>
+            <div><strong>GP</strong> = Gols Pró, quantidade de gols do jogador, tem peso 0,2 ponto por gol.</div>
+            <div><strong>GC</strong> = Gols Contra, quantidade de gols contra do jogador, tem peso -0,2 ponto por gol.</div>
+            <div><strong>BC</strong> = Bola Cheia, quantidade de vezes que venceu a votação, tem peso 0,5 ponto.</div>
+            <div><strong>BM</strong> = Bola Murcha, quantidade de vezes que venceu a votação negativa, tem peso -0,5 ponto.</div>
+          </div>
+        </>
       )}
     </div>
   );
