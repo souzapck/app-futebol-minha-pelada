@@ -704,14 +704,14 @@ export default function PointsRankingPage() {
             }}
           >
             <div><strong>Mapa de contagem da pontuação:</strong></div>
-            <div><strong>PT</strong> = Pontos Total, quantidade totatl de pontos do jogador.</div>
-            <div><strong>V</strong> = Vitórias, quantidade de vitórias do jogador, tem peso 3 pontos.</div>
-            <div><strong>E</strong> = Empates, quantidade de empates do jogador, tem peso 1 ponto.</div>
-            <div><strong>D</strong> = Derrotas, quantidade de derrotas do jogador, tem peso 0 ponto.</div>
-            <div><strong>GP</strong> = Gols Pró, quantidade de gols do jogador, tem peso 0,2 ponto por gol.</div>
-            <div><strong>GC</strong> = Gols Contra, quantidade de gols contra do jogador, tem peso -0,2 ponto por gol.</div>
-            <div><strong>BC</strong> = Bola Cheia, quantidade de vezes que venceu a votação, tem peso 0,5 ponto.</div>
-            <div><strong>BM</strong> = Bola Murcha, quantidade de vezes que venceu a votação negativa, tem peso -0,5 ponto.</div>
+            <div><strong>PT</strong> = Pontos Total, soma total de pontos do jogador.</div>
+            <div><strong>V</strong> = Vitórias, tem peso 3 pontos.</div>
+            <div><strong>E</strong> = Empates, tem peso 1 ponto.</div>
+            <div><strong>D</strong> = Derrotas, tem peso 0 ponto.</div>
+            <div><strong>GP</strong> = Gols Pró, tem peso 0,2 ponto por gol.</div>
+            <div><strong>GC</strong> = Gols Contra, tem peso -0,2 ponto por gol contra.</div>
+            <div><strong>BC</strong> = Bola Cheia, tem peso 0,5 ponto.</div>
+            <div><strong>BM</strong> = Bola Murcha, tem peso -0,5 ponto.</div>
           </div>
         </>
       )}
