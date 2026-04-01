@@ -609,7 +609,7 @@ export default function PointsRankingPage() {
                       {getPosLabel(index)}
                     </td>
 
-                    <td style={{ padding: "6px 2px", color: "#333", minWidth: "120px" }}>
+                    <td style={{ padding: "6px 2px", color: "#333", minWidth: "80px" }}>
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         <span>
                           <span style={{ color: "#007bff", marginRight: "5px" }}>
@@ -619,7 +619,7 @@ export default function PointsRankingPage() {
                           </span>
                           {jogador.name}
                         </span>
-                        <span style={{ fontSize: "11px", color: "#888" }}>
+                        <span style={{ fontSize: "10px", color: "#888" }}>
                           {jogador.position}
                         </span>
                       </div>
@@ -652,7 +652,7 @@ export default function PointsRankingPage() {
                       style={{
                         padding: "6px 2px",
                         textAlign: "center",
-                        fontSize: "15px"
+                        fontSize: "14px"
                       }}
                     >
                       {renderHoverCell(
