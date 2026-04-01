@@ -575,16 +575,16 @@ export default function PointsRankingPage() {
                     color: "#444"
                   }}
                 >
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>Pos</th>
-                  <th style={{ padding: "10px 6px" }}>Jogador</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>PT</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>V</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>E</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>D</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>GP</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>GC</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>BC</th>
-                  <th style={{ padding: "10px 6px", textAlign: "center" }}>BM</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>Pos</th>
+                  <th style={{ padding: "8px 2px" }}>Jogador</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>PT</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>V</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>E</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>D</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>GP</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>GC</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>BC</th>
+                  <th style={{ padding: "8px 2px", textAlign: "center" }}>BM</th>
                 </tr>
               </thead>
 
@@ -599,7 +599,7 @@ export default function PointsRankingPage() {
                   >
                     <td
                       style={{
-                        padding: "10px 6px",
+                        padding: "6px 2px",
                         textAlign: "center",
                         fontWeight: "bold",
                         color: "#555",
@@ -609,7 +609,7 @@ export default function PointsRankingPage() {
                       {getPosLabel(index)}
                     </td>
 
-                    <td style={{ padding: "10px 6px", color: "#333", minWidth: "120px" }}>
+                    <td style={{ padding: "6px 2px", color: "#333", minWidth: "120px" }}>
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         <span>
                           <span style={{ color: "#007bff", marginRight: "5px" }}>
@@ -650,7 +650,7 @@ export default function PointsRankingPage() {
 
                     <td
                       style={{
-                        padding: "10px 6px",
+                        padding: "6px 2px",
                         textAlign: "center",
                         fontSize: "15px"
                       }}
@@ -663,25 +663,25 @@ export default function PointsRankingPage() {
                       )}
                     </td>  
 
-                    <td style={{ padding: "10px 6px", textAlign: "center" }}>                   
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>                   
                       {renderHoverCell(jogador, "V", jogador.V, "#2e7d32")}                                  
                     </td>
-                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
                       {renderHoverCell(jogador, "E", jogador.E, "#6c757d")}
                     </td>
-                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
                       {renderHoverCell(jogador, "D", jogador.D, "#999")}
                     </td>
-                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
                       {renderHoverCell(jogador, "GP", jogador.GP, "#198754")}
                     </td>
-                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
                       {renderHoverCell(jogador, "GC", jogador.GC, "#dc3545")}
                     </td>
-                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
                       {renderHoverCell(jogador, "BC", jogador.BC, "#2e7d32")}
                     </td>
-                    <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
                       {renderHoverCell(jogador, "BM", jogador.BM, "#8e24aa")}
                     </td>
                   </tr>
