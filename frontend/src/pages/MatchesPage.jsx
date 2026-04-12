@@ -202,27 +202,13 @@ export default function MatchesPage({ user }) {
     if (!confirmDelete) return;
 
     try {
-      // 1. apaga confirmações / gols / times ligados à partida
-      const { error: mpError } = await supabase
-        .from("match_player")
-        .delete()
-        .eq("match_id", matchId);
+      const { error } = await supabase.rpc("delete_match_cascade", {
+        p_match_id: matchId
+      });
 
-      if (mpError) {
-        console.error(mpError);
-        alert("❌ Erro ao excluir dados da partida.");
-        return;
-      }
-
-      // 2. apaga a partida
-      const { error: matchError } = await supabase
-        .from("matches")
-        .delete()
-        .eq("id", matchId);
-
-      if (matchError) {
-        console.error(matchError);
-        alert("❌ Erro ao excluir o jogo.");
+      if (error) {
+        console.error(error);
+        alert(`❌ Erro ao excluir o jogo: ${error.message}`);
         return;
       }
 
@@ -233,6 +219,8 @@ export default function MatchesPage({ user }) {
         setStatusMap({});
         setShirtMap({});
       }
+
+      alert("✅ Jogo excluído com sucesso!");
     } catch (error) {
       console.error(error);
       alert("❌ Erro ao excluir o jogo.");
