@@ -60,7 +60,7 @@ export default function PlayersPage({ user }) {
 
       if (!existingUser) {
         if (!jogador.phone || String(jogador.phone).trim() === "") {
-          alert("❌ Este jogador não tem telefone. Cadastre o telefone primeiro.");
+          alert("❌ Este jogador não tem telefone. Não foi possivel criar seu usuário.");
           return;
         }
 
@@ -381,8 +381,7 @@ export default function PlayersPage({ user }) {
         const { error: updateUserError } = await supabase
           .from("users")
           .update({
-            phone: payload.phone,
-            password: senhaPadrao
+            phone: payload.phone // ✅ NÃO altera senha
           })
           .eq("player_id", playerId);
 
