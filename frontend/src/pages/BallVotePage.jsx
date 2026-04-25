@@ -73,8 +73,21 @@ export default function BallVotePage({ user }) {
       return;
     }
 
+
+
+
+
     const confirmados = (matchPlayersData || [])
-      .filter((item) => String(item.status || "").trim().toLowerCase() === "confirmado")
+      .filter((item) => {
+        const statusOk = String(item.status || "").trim().toLowerCase() === "confirmado";
+
+        // excluir quem não jogou (ajuste conforme sua regra)
+        const isActive =
+          !item.post_draw_action ||
+          item.post_draw_action === "included";
+
+        return statusOk && isActive;
+      })
       .map((item) => {
         const player = (playersData || []).find(
           (p) => Number(p.id) === Number(item.player_id)
@@ -149,12 +162,16 @@ export default function BallVotePage({ user }) {
 
   const bolaCheiaPlayer = players.find((p) => p.id === bolaCheiaId);
   const bolaMurchaPlayer = players.find((p) => p.id === bolaMurchaId);
+  const isUserAllowedToVote = players.some(
+    (p) => Number(p.id) === Number(user?.player_id)
+  );
 
   const getVotingWindow = (matchDate) => {
     if (!matchDate) return null;
 
     const start = new Date(`${matchDate}T22:30:00-03:00`);
-    const end = new Date(start.getTime() + 15 * 60 * 1000);
+    //const end = new Date(start.getTime() + 15 * 60 * 1000);
+    const end = new Date(start.getTime() + 25 * 60 * 60 * 1000);
 
     return { start, end };
   };
@@ -285,7 +302,8 @@ export default function BallVotePage({ user }) {
     !!bolaMurchaId &&
     bolaCheiaId !== bolaMurchaId &&
     isVotingOpen &&
-    !existingVote;
+    !existingVote &&
+    isUserAllowedToVote;
 
   const formatPlayerLine = (p) => {
     const teamLabel =
@@ -300,6 +318,15 @@ export default function BallVotePage({ user }) {
 
   const handleSaveVote = async () => {
     if (!selectedMatch || !isVotingOpen || existingVote) return;
+
+    const isUserAllowedToVote = players.some(
+      (p) => Number(p.id) === Number(user?.player_id)
+    );
+
+    if (!isUserAllowedToVote) {
+      alert("❌ Você não participou desta partida e não pode votar.");
+      return;
+    }
 
     if (!bolaCheiaId || !bolaMurchaId || bolaCheiaId === bolaMurchaId) {
       alert("⚠️ Escolha jogadores diferentes para bola cheia e bola murcha.");
@@ -579,6 +606,22 @@ export default function BallVotePage({ user }) {
                       }}
                     >
                       ⚠️ O mesmo jogador não pode ser bola cheia e bola murcha.
+                    </div>
+                  )}
+
+                  {!isUserAllowedToVote && (
+                    <div
+                      style={{
+                        background: "#f8d7da",
+                        color: "#721c24",
+                        border: "1px solid #f5c6cb",
+                        borderRadius: "8px",
+                        padding: "10px",
+                        fontSize: "14px",
+                        marginBottom: "12px"
+                      }}
+                    >
+                      ❌ Você não participou desta partida e não pode votar.
                     </div>
                   )}
 
