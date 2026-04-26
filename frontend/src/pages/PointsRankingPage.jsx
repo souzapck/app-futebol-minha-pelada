@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
 
+// Constantes de Tempo
+const DURACAO_T1 = 15 * 60 * 1000; 
+const INTERVALO = 1 * 60 * 1000;
+const DURACAO_T2 = 10 * 60 * 1000;
+
 export default function PointsRankingPage() {
   const [mode, setMode] = useState("general"); // general | round
   const [matches, setMatches] = useState([]);
@@ -9,7 +14,9 @@ export default function PointsRankingPage() {
   const [loading, setLoading] = useState(true);
   const [hoveredPlayerId, setHoveredPlayerId] = useState(null);
   const [hoveredCell, setHoveredCell] = useState(null);
-
+  
+  // Novo estado para saber se a partida selecionada ainda está rolando
+  const [isOngoing, setIsOngoing] = useState(false);
 
   useEffect(() => {
     loadBaseData();
@@ -47,6 +54,7 @@ export default function PointsRankingPage() {
 
   const loadRanking = async () => {
     setLoading(true);
+    setIsOngoing(false);
 
     const { data: playersData, error: playersError } = await supabase
       .from("players")
@@ -71,7 +79,47 @@ export default function PointsRankingPage() {
       return;
     }
 
-    const matchIds = matchesToUse.map((m) => m.id);
+    const now = new Date();
+    const finishedMatches = [];
+
+    // === TRAVA DE TEMPO (BLOQUEIO DA PARTIDA ATUAL) ===
+    matchesToUse.forEach((match) => {
+      // Pega o índice real da partida na lista geral para saber se é a mais recente
+      const originalIndex = matches.findIndex(m => m.id === match.id);
+ 
+      // === AMBIENTE DE TESTES ===
+      // Se for a partida mais recente (index 0), usa a data do seu teste.
+      // Se for uma partida antiga (index > 0), usa a data REAL dela para liberar no ranking.
+ /*
+      let t1Start;
+      if (originalIndex === 0) {
+        t1Start = new Date("2026-04-26T02:25:00-03:00"); 
+      } else {
+        t1Start = new Date(`${match.date}T22:30:00-03:00`);
+      }
+*/
+      // === AMBIENTE DE PRODUÇÃO ===
+      // Quando for subir oficial, apague o bloco IF/ELSE acima e deixe apenas esta linha:      
+      const t1Start = new Date(`${match.date}T22:30:00-03:00`);
+      const t1End = new Date(t1Start.getTime() + DURACAO_T1);
+      const t2Start = new Date(t1End.getTime() + INTERVALO);
+      const t2End = new Date(t2Start.getTime() + DURACAO_T2);
+
+      // A partida só entra para o cálculo de pontos se o 2º turno já fechou
+      if (now > t2End) {
+        finishedMatches.push(match);
+      }
+    });
+
+    // Se no modo "Por Rodada" a partida ainda estiver bloqueada, avisa a UI
+    if (matchesToUse.length > 0 && finishedMatches.length === 0) {
+      setRanking([]);
+      setIsOngoing(true);
+      setLoading(false);
+      return;
+    }
+
+    const matchIds = finishedMatches.map((m) => m.id);
 
     const { data: matchPlayersData, error: mpError } = await supabase
       .from("match_player")
@@ -133,19 +181,25 @@ export default function PointsRankingPage() {
       matchPlayersByMatch[item.match_id].push(item);
     });
 
+    // === SEGREGAÇÃO DE VOTOS POR TURNO ===
     const votesByMatch = {};
     (votesData || []).forEach((vote) => {
       if (!votesByMatch[vote.match_id]) {
-        votesByMatch[vote.match_id] = [];
+        votesByMatch[vote.match_id] = { round1: [], round2: [] };
       }
-      votesByMatch[vote.match_id].push(vote);
+      if (vote.round === 2) {
+        votesByMatch[vote.match_id].round2.push(vote);
+      } else {
+        votesByMatch[vote.match_id].round1.push(vote);
+      }
     });
 
-    matchesToUse.forEach((match) => {
+    finishedMatches.forEach((match) => {
       const playersInMatch = (matchPlayersByMatch[match.id] || []).filter(
         (item) => item.team === "A" || item.team === "B"
       );
 
+      // 1. Calcula os pontos da partida (Gols, Vitórias, Derrotas)
       playersInMatch.forEach((item) => {
         const row = ensurePlayer(item.player_id);
         if (!row) return;
@@ -180,19 +234,19 @@ export default function PointsRankingPage() {
         row.PT -= golsContra * 0.2;
       });
 
-      const votes = votesByMatch[match.id] || [];
+      // 2. Calcula os pontos dos Votos (Priorizando o Turno 2 se existir)
+      const matchRounds = votesByMatch[match.id] || { round1: [], round2: [] };
+      const activeVotes = matchRounds.round2.length > 0 ? matchRounds.round2 : matchRounds.round1;
+
       const cheiaCount = {};
       const murchaCount = {};
 
-      votes.forEach((vote) => {
+      activeVotes.forEach((vote) => {
         if (vote.bola_cheia_player_id) {
-          cheiaCount[vote.bola_cheia_player_id] =
-            (cheiaCount[vote.bola_cheia_player_id] || 0) + 1;
+          cheiaCount[vote.bola_cheia_player_id] = (cheiaCount[vote.bola_cheia_player_id] || 0) + 1;
         }
-
         if (vote.bola_murcha_player_id) {
-          murchaCount[vote.bola_murcha_player_id] =
-            (murchaCount[vote.bola_murcha_player_id] || 0) + 1;
+          murchaCount[vote.bola_murcha_player_id] = (murchaCount[vote.bola_murcha_player_id] || 0) + 1;
         }
       });
 
@@ -308,7 +362,7 @@ export default function PointsRankingPage() {
         <hr style={{ borderColor: "rgba(255,255,255,0.2)", margin: "2px 0" }} />
         <div>
           <strong>
-            {V} | {E} | {D} | {GP.toFixed(2)} | {GC.toFixed(2)} | {BC.toFixed(2)} | {BM.toFixed(2)}
+            {jogador.V} | {jogador.E} | {jogador.D} | {jogador.GP.toFixed(2)} | {jogador.GC.toFixed(2)} | {jogador.BC.toFixed(2)} | {jogador.BM.toFixed(2)}
           </strong>
         </div>
       </div>
@@ -322,54 +376,14 @@ export default function PointsRankingPage() {
     const breakdown = calcBreakdown(jogador);
 
     const config = {
-      V: {
-        label: "Vitórias",
-        qty: jogador.V,
-        weight: 3,
-        points: breakdown.V
-      },
-      E: {
-        label: "Empates",
-        qty: jogador.E,
-        weight: 1,
-        points: breakdown.E
-      },
-      D: {
-        label: "Derrotas",
-        qty: jogador.D,
-        weight: 0,
-        points: breakdown.D
-      },
-      GP: {
-        label: "Gols Pró",
-        qty: jogador.GP,
-        weight: 0.2,
-        points: breakdown.GP
-      },
-      GC: {
-        label: "Gols Contra",
-        qty: jogador.GC,
-        weight: -0.2,
-        points: breakdown.GC
-      },
-      BC: {
-        label: "Bola Cheia",
-        qty: jogador.BC,
-        weight: 0.5,
-        points: breakdown.BC
-      },
-      BM: {
-        label: "Bola Murcha",
-        qty: jogador.BM,
-        weight: -0.5,
-        points: breakdown.BM
-      },
-      PT: {
-        label: "Pontuação Total",
-        qty: null,
-        weight: null,
-        points: jogador.PT
-      }
+      V: { label: "Vitórias", qty: jogador.V, weight: 3, points: breakdown.V },
+      E: { label: "Empates", qty: jogador.E, weight: 1, points: breakdown.E },
+      D: { label: "Derrotas", qty: jogador.D, weight: 0, points: breakdown.D },
+      GP: { label: "Gols Pró", qty: jogador.GP, weight: 0.2, points: breakdown.GP },
+      GC: { label: "Gols Contra", qty: jogador.GC, weight: -0.2, points: breakdown.GC },
+      BC: { label: "Bola Cheia", qty: jogador.BC, weight: 0.5, points: breakdown.BC },
+      BM: { label: "Bola Murcha", qty: jogador.BM, weight: -0.5, points: breakdown.BM },
+      PT: { label: "Pontuação Total", qty: null, weight: null, points: jogador.PT }
     };
 
     const item = config[column];
@@ -419,31 +433,31 @@ export default function PointsRankingPage() {
     );
   };
 
-    const renderHoverCell = (jogador, column, displayValue, textColor = "#333") => {
-      const isOpen =
-        hoveredCell?.playerId === jogador.id && hoveredCell?.column === column;
+  const renderHoverCell = (jogador, column, displayValue, textColor = "#333") => {
+    const isOpen =
+      hoveredCell?.playerId === jogador.id && hoveredCell?.column === column;
 
-      return (
-        <div
-          style={{ position: "relative", display: "inline-block" }}
-          onMouseEnter={() => setHoveredCell({ playerId: jogador.id, column })}
-          onMouseLeave={() => setHoveredCell(null)}
+    return (
+      <div
+        style={{ position: "relative", display: "inline-block" }}
+        onMouseEnter={() => setHoveredCell({ playerId: jogador.id, column })}
+        onMouseLeave={() => setHoveredCell(null)}
+      >
+        <span
+          style={{
+            cursor: "help",
+            borderBottom: "1px dotted #999",
+            color: textColor,
+            fontWeight: "bold"
+          }}
         >
-          <span
-            style={{
-              cursor: "help",
-              borderBottom: "1px dotted #999",
-              color: textColor,
-              fontWeight: "bold"
-            }}
-          >
-            {displayValue}
-          </span>
+          {displayValue}
+        </span>
 
-          {isOpen && renderColumnTooltip(jogador, column)}
-        </div>
-      );
-    };
+        {isOpen && renderColumnTooltip(jogador, column)}
+      </div>
+    );
+  };
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}> 
@@ -536,6 +550,19 @@ export default function PointsRankingPage() {
         >
           Carregando pontuação...
         </div>
+      ) : isOngoing ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "40px",
+            color: "#856404",
+            background: "#fff3cd",
+            border: "1px solid #ffeeba",
+            borderRadius: "12px"
+          }}
+        >
+          ⏳ A pontuação desta rodada será consolidada após o encerramento da votação.
+        </div>
       ) : ranking.length === 0 ? (
         <div
           style={{
@@ -625,29 +652,6 @@ export default function PointsRankingPage() {
                       </div>
                     </td>
 
-               {/*     <td
-                      style={{
-                        padding: "10px 6px",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                        fontSize: "15px",
-                        color: jogador.PT >= 0 ? "#1565c0" : "#dc3545"
-                      }}
-                    >
-                      <div
-                        style={{ position: "relative", display: "inline-block" }}
-                        onMouseEnter={() => setHoveredPlayerId(jogador.id)}
-                        onMouseLeave={() => setHoveredPlayerId(null)}
-                      >
-                        <span style={{cursor: "help",borderBottom: "1px dotted #999"}}>
-                          {jogador.PT.toFixed(2)}
-                        </span>
-
-                        {hoveredPlayerId === jogador.id && renderPointsTooltipPT(jogador)}
-                      </div>
-                    </td>
-                  */}
-
                     <td
                       style={{
                         padding: "6px 2px",
@@ -663,7 +667,7 @@ export default function PointsRankingPage() {
                       )}
                     </td>  
 
-                    <td style={{ padding: "6px 2px", textAlign: "center" }}>                   
+                    <td style={{ padding: "6px 2px", textAlign: "center" }}>                  
                       {renderHoverCell(jogador, "V", jogador.V, "#2e7d32")}                                  
                     </td>
                     <td style={{ padding: "6px 2px", textAlign: "center" }}>
