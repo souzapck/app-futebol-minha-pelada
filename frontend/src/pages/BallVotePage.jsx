@@ -393,16 +393,16 @@ export default function BallVotePage({ user }) {
             {/* --- DESTAQUE: VENCEDORES --- */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "25px" }}>
               <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #c3e6cb" }}>
-                <div style={{ fontSize: "12px", fontWeight: "bold", color: "#2f9e44", textTransform: "uppercase" }}>⚽ BOLA CHEIA</div>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#2f9e44", textTransform: "uppercase" }}>⚽ CHEIA</div>
                 {vencedoresC.map(v => (
-                  <div key={v.id} style={{ fontSize: "18px", fontWeight: "800", color: "#1b5e20", marginTop: "5px" }}>{v.name}</div>
+                  <div key={v.id} style={{ fontSize: "16px", fontWeight: "800", color: "#1b5e20", marginTop: "5px" }}>{v.name}</div>
                 ))}
               </div>
 
               <div style={{ background: "#fff5f5", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #f5c6cb" }}>
-                <div style={{ fontSize: "12px", fontWeight: "bold", color: "#e03131", textTransform: "uppercase" }}>🎈 BOLA MURCHA</div>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#e03131", textTransform: "uppercase" }}>🎈 MURCHA</div>
                 {vencedoresM.map(v => (
-                  <div key={v.id} style={{ fontSize: "18px", fontWeight: "800", color: "#c92a2a", marginTop: "5px" }}>{v.name}</div>
+                  <div key={v.id} style={{ fontSize: "16px", fontWeight: "800", color: "#c92a2a", marginTop: "5px" }}>{v.name}</div>
                 ))}
               </div>
             </div>
@@ -411,9 +411,9 @@ export default function BallVotePage({ user }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
               {/* Coluna Cheia */}
               <div>
-                <p style={{ fontSize: "11px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>RANKING DETALHADO</p>
+                <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
                 {rankingCheia.map(r => (
-                  <div key={r.id} style={{ fontSize: "13px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
+                  <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
                     <strong>{r.name}</strong> - <small>{r.team === 'A' ? 'Preto' : 'Verm'}</small> <strong>({r.total})</strong>
                   </div>
                 ))}
@@ -421,9 +421,9 @@ export default function BallVotePage({ user }) {
 
               {/* Coluna Murcha */}
               <div>
-                <p style={{ fontSize: "11px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>RANKING DETALHADO</p>
+                <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
                 {rankingMurcha.map(r => (
-                  <div key={r.id} style={{ fontSize: "13px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
+                  <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
                     <strong>{r.name}</strong> - <small>{r.team === 'A' ? 'Preto' : 'Verm'}</small> <strong>({r.total})</strong>
                   </div>
                 ))}
