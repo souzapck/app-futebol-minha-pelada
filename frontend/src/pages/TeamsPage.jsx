@@ -1019,11 +1019,11 @@ export default function TeamsPage({ user }) {
             <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
               <div
                 style={{
-                  width: "30px",
-                  minWidth: "30px",
+                  width: "33px",
+                  minWidth: "33px",
                   display: "flex",
                   justifyContent: "flex-end",
-                  marginRight: "10px"
+                  marginRight: "7px"
                 }}
               >
                 {p.fixed_shirt_number ? (
@@ -1032,7 +1032,7 @@ export default function TeamsPage({ user }) {
                       width: "30px",
                       textAlign: "center",
                       fontWeight: "bold",
-                      fontSize: "11px",
+                      fontSize: "10px",
                       color: "#333",
                       display: "inline-block"
                     }}
@@ -1048,7 +1048,7 @@ export default function TeamsPage({ user }) {
                     onChange={(e) => handleShirtChange(p.id, e.target.value)}
                     disabled={selectedMatch.is_drawn}
                     style={{
-                      width: "40px",
+                      width: "42px",
                       padding: "3px",
                       textAlign: "center",
                       borderRadius: "4px",
@@ -1056,7 +1056,7 @@ export default function TeamsPage({ user }) {
                       backgroundColor: "#fff",
                       color: "#000",
                       fontWeight: "bold",
-                      fontSize: "11px",
+                      fontSize: "10px",
                       outline: "none",
                       boxSizing: "border-box"
                     }}
@@ -1068,7 +1068,7 @@ export default function TeamsPage({ user }) {
               <span
                 style={{
                   textAlign: "left",
-                  fontSize: "11px",
+                  fontSize: "10px",
                   fontWeight: "500",
                   flex: 1,
                   minWidth: 0,
