@@ -300,7 +300,7 @@ export default function MatchesPage({ user }) {
   ).length;
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
+    <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "40px" }}>
       {/* SÓ MOSTRA O BOTÃO DE CRIAR JOGO SE FOR ADMIN */}
       {user?.is_admin && (
         <button
@@ -325,7 +325,8 @@ export default function MatchesPage({ user }) {
 
       <div
         style={{
-          display: "flex",
+          //display: "flex",
+          maxWidth: "600px",
           gap: "10px",
           overflowX: "auto",
           paddingBottom: "10px",
@@ -337,9 +338,10 @@ export default function MatchesPage({ user }) {
             key={m.id}
             onClick={() => selectMatch(m)}
             style={{
-              minWidth: "110px",
-              padding: "10px",
-              borderRadius: "8px",
+              marginBottom: "5px",
+              marginInline: "3px",
+              padding: "12px",
+              borderRadius: "15px",
               cursor: "pointer",
               border:
                 selectedMatch?.id === m.id
@@ -360,7 +362,7 @@ export default function MatchesPage({ user }) {
           style={{
             background: "#f8f9fa",
             borderRadius: "12px",
-            padding: "15px",
+            padding: "5px",
             border: "1px solid #eee"
           }}
         >

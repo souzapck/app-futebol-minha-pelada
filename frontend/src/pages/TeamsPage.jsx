@@ -1135,7 +1135,7 @@ export default function TeamsPage({ user }) {
     <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
       <div
         style={{
-          display: "flex",
+          //display: "flex",
           gap: "10px",
           overflowX: "auto",
           marginBottom: "20px",
@@ -1147,9 +1147,11 @@ export default function TeamsPage({ user }) {
             key={m.id}
             onClick={() => loadMatchData(m)}
             style={{
-              minWidth: "110px",
-              padding: "10px",
-              borderRadius: "8px",
+              //minWidth: "110px",
+              marginBottom: "5px",
+              marginInline: "3px",
+              padding: "12px",
+              borderRadius: "15px",
               cursor: "pointer",
               border:
                 selectedMatch?.id === m.id
