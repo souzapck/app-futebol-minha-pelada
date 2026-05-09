@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { useGroup } from "../contexts/GroupContext";
 
 // Constantes de Tempo
 const DURACAO_T1 = 15 * 60 * 1000; 
@@ -25,14 +26,28 @@ export default function BallVotePage({ user }) {
   const [runoffCandidates, setRunoffCandidates] = useState({ cheia: [], murcha: [] });
   const [allVotes, setAllVotes] = useState([]);
 
-  // 1. CARREGAMENTO INICIAL
+  const { activeGroup, isAdmin } = useGroup();
+
   useEffect(() => {
-    loadMatches();
-  }, []);
+    if (activeGroup) {
+      loadMatches();
+      setSelectedMatchId("");
+      setPlayers([]);
+      setAllVotes([]);
+      setExistingVote(null);
+      setRunoffCandidates({ cheia: [], murcha: [] });
+      setCurrentRound(1);
+    }
+  }, [activeGroup]);
 
   const loadMatches = async () => {
     setLoadingMatches(true);
-    const { data, error } = await supabase.from("matches").select("*").order("date", { ascending: false });
+    const { data, error } = await supabase
+      .from("matches")
+      .select("*")
+      .eq("id_grupo", activeGroup.id_grupo)
+      .order("date", { ascending: false });
+    
     setLoadingMatches(false);
     if (!error) setMatches(data || []);
   };
@@ -40,25 +55,28 @@ export default function BallVotePage({ user }) {
   const loadConfirmedPlayers = async (matchId) => {
     if (!matchId) return setPlayers([]);
     setLoadingPlayers(true);
+    
+    // === CORREÇÃO CRÍTICA: Removidos position e rating que não estão mais na tabela players global ===
     const { data, error } = await supabase
       .from("match_player")
-      .select(`shirt_number, team, status, post_draw_action, player_id, players:player_id!inner (id, name, position, rating)`)
+      .select(`shirt_number, team, status, post_draw_action, player_id, players:player_id!inner (id, name)`)
       .eq("match_id", matchId)
       .eq("status", "confirmado");
 
     setLoadingPlayers(false);
     if (!error) {
-      setPlayers(data.filter(i => !i.post_draw_action || i.post_draw_action === "included").map(i => ({
+      // Corrigido "included" para "incluido" que é o status salvo no banco em português
+      setPlayers(data.filter(i => !i.post_draw_action || i.post_draw_action === "incluido").map(i => ({
         id: i.players.id,
         name: i.players.name,
-        position: i.players.position,
         team: i.team,
-        shirt_number: i.shirt_number ?? i.players.shirt_number
+        shirt_number: i.shirt_number
       })));
+    } else {
+        console.error("Erro ao carregar jogadores confirmados:", error);
     }
   };
 
-  // 2. GATILHOS DE VOTOS
   const loadMatchVotes = async (matchId) => {
     const { data, error } = await supabase.from("match_votes").select("*").eq("match_id", matchId);
     if (!error) setAllVotes(data || []);
@@ -93,40 +111,28 @@ export default function BallVotePage({ user }) {
     }
   };
 
-  // === SOLUÇÃO APLICADA AQUI ===
-  // Garante que o voto do usuário seja validado assim que ele entra na tela (resolve o problema do re-login)
   useEffect(() => {
     if (selectedMatchId && user?.player_id) {
       loadExistingVote(selectedMatchId, currentRound);
     }
   }, [selectedMatchId, user?.player_id]); 
-  // =============================
 
-  // 3. LÓGICA DO TIMER
   useEffect(() => {
     if (!selectedMatchId || matches.length === 0) return;
     const match = matches.find(m => String(m.id) === String(selectedMatchId));
     if (!match) return;
 
     const updateTimer = () => {
-      // === BLOQUEIO DE PARTIDAS ANTERIORES ===
-      // Verifica se a partida selecionada é a mais recente da lista (índice 0)
       const isLatestMatch = matches.length > 0 && match.id === matches[0].id;
 
       if (!isLatestMatch) {
         setTimeLeft("Votação encerrada (Partida Anterior).");
         setIsVotingOpen(false);
-        return; // Interrompe o relógio aqui. Partidas velhas só mostram resultados.
+        return; 
       }
 
       const now = new Date();
-      
-      // === PRODUÇÃO (Usa a data do jogo) ===
       const t1Start = new Date(`${match.date}T22:30:00-03:00`); 
-      
-      // === TESTES (Se precisar testar novamente, comente a linha acima e descomente a debaixo) ===
-      // const t1Start = new Date("2026-04-26T02:25:00-03:00"); 
-
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);
       const t2Start = new Date(t1End.getTime() + INTERVALO);
       const t2End = new Date(t2Start.getTime() + DURACAO_T2);
@@ -149,7 +155,6 @@ export default function BallVotePage({ user }) {
         setTimeLeft("Apurando empates... 2º Turno em breve.");
         setIsVotingOpen(false);
       } else if (now <= t2End) {
-        // Usa o estado já calculado com segurança
         const hasEmpate = runoffCandidates.cheia.length > 1 || runoffCandidates.murcha.length > 1;
         
         if (hasEmpate) {
@@ -177,7 +182,6 @@ export default function BallVotePage({ user }) {
     return () => clearInterval(interval);
   }, [selectedMatchId, matches, currentRound, runoffCandidates]);
 
-  // 4. PROCESSAMENTO E SALVAMENTO
   const getRunoffCandidates = (votesT1) => {
     const counts = votesT1.reduce((acc, v) => {
       acc.c[v.bola_cheia_player_id] = (acc.c[v.bola_cheia_player_id] || 0) + 1;
@@ -193,7 +197,7 @@ export default function BallVotePage({ user }) {
   };
 
   const handleSaveVote = async () => {
-    if (loadingVote) return; // Trava contra cliques duplos
+    if (loadingVote) return; 
     if (!bolaCheiaId || !bolaMurchaId) return alert("Selecione os dois!");
     if (bolaCheiaId === bolaMurchaId) return alert("Não pode ser a mesma pessoa!");
     
@@ -203,6 +207,7 @@ export default function BallVotePage({ user }) {
     const { data, error } = await supabase
       .from("match_votes")
       .insert([{
+        id_grupo: activeGroup.id_grupo, 
         match_id: selectedMatchId,
         voter_player_id: user.player_id,
         bola_cheia_player_id: bolaCheiaId,
@@ -233,38 +238,34 @@ export default function BallVotePage({ user }) {
     return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   };
 
-  // Verifica se o usuário atual jogou a partida selecionada
   const isUserAllowedToVote = players.some(
     (p) => Number(p.id) === Number(user?.player_id)
   );
 
-  // 5. FUNÇÕES DE RENDERIZAÇÃO DE INTERFACE
   const renderVotingArea = (round) => {
     const isRoundActive = currentRound === round && isVotingOpen;
     const hasVotedThisRound = existingVote && existingVote.round === round;
     
-    // Trava geral para a área de votação
     const canVote = isRoundActive && isUserAllowedToVote && !hasVotedThisRound;
+
+    const selectedMatch = matches.find(m => String(m.id) === String(selectedMatchId));
 
     return (
       <div style={{ background: "#fff", borderRadius: "12px", padding: "16px", border: "1px solid #eee", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
         <h4 style={{ margin: "0 0 15px 0" }}>{round === 1 ? "📝 1º Turno" : "🔥 2º Turno (Desempate)"}</h4>
         
-        {/* Aviso de erro (Mesmo Jogador) */}
         {bolaCheiaId && bolaMurchaId && bolaCheiaId === bolaMurchaId && (
           <div style={{ background: "#fff3cd", color: "#856404", border: "1px solid #ffeeba", borderRadius: "8px", padding: "10px", fontSize: "14px", marginBottom: "12px" }}>
             ⚠️ O mesmo jogador não pode ser bola cheia e bola murcha.
           </div>
         )}
 
-        {/* Aviso de Restrição (Não Participou) */}
         {!isUserAllowedToVote && (
           <div style={{ background: "#f8d7da", color: "#721c24", border: "1px solid #f5c6cb", borderRadius: "8px", padding: "10px", fontSize: "14px", marginBottom: "12px" }}>
             ❌ Você não participou desta partida e não pode votar.
           </div>
         )}
 
-        {/* Aviso de Sucesso (Já Votou) */}
         {hasVotedThisRound ? (
           <div style={{ padding: "12px", background: "#d4edda", color: "#155724", borderRadius: "8px", fontWeight: "500", border: "1px solid #c3e6cb" }}>
             ✅ Seu voto foi registrado.
@@ -276,12 +277,37 @@ export default function BallVotePage({ user }) {
               const canMurcha = round === 1 || runoffCandidates.murcha.includes(p.id);
               if (!canCheia && !canMurcha) return null;
 
-              // Condição para desabilitar o clique nos jogadores
               const disableClick = !canVote || p.id === user?.player_id;
+
+              // === TAGS DINÂMICAS DE TIME ===
+              const teamName = p.team === "A" ? (selectedMatch?.team_a_name || "Time A") : p.team === "B" ? (selectedMatch?.team_b_name || "Time B") : "";
+              const teamColor = p.team === "A" ? (selectedMatch?.team_a_color || "#333") : p.team === "B" ? (selectedMatch?.team_b_color || "#333") : "transparent";
 
               return (
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px", background: "#f8f9fa", borderRadius: "8px", opacity: disableClick ? 0.6 : 1 }}>
-                  <span style={{ fontSize: "14px" }}>{p.name} {p.id === user?.player_id && <small style={{color: "#888"}}>(Você)</small>}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0 }}>
+                    
+                    {/* Badge do Time */}
+                    {p.team && selectedMatch?.is_drawn && (
+                      <span style={{ 
+                        background: teamColor, 
+                        color: "#fff", 
+                        fontSize: "10px", 
+                        padding: "3px 6px", 
+                        borderRadius: "4px",
+                        fontWeight: "bold",
+                        textTransform: "uppercase",
+                        whiteSpace: "nowrap"
+                      }}>
+                        {teamName}
+                      </span>
+                    )}
+
+                    <span style={{ fontSize: "14px", fontWeight: "bold", color: "#333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {p.name} {p.id === user?.player_id && <small style={{color: "#888", fontWeight: "normal"}}>(Você)</small>}
+                    </span>
+                  </div>
+
                   <div style={{ display: "flex", gap: "6px" }}>
                     {canCheia && (
                       <button 
@@ -306,7 +332,6 @@ export default function BallVotePage({ user }) {
               );
             })}
             
-            {/* Botão de Salvar com o visual solicitado */}
             <button 
               onClick={handleSaveVote} 
               disabled={!canVote || !bolaCheiaId || !bolaMurchaId || loadingVote}
@@ -340,7 +365,6 @@ export default function BallVotePage({ user }) {
     let rankingCheia = [];
     let rankingMurcha = [];
 
-    // Só processamos os rankings se houver votos para o turno
     if (totalVotes > 0) {
       const processRanking = (type) => {
         const map = {};
@@ -378,19 +402,16 @@ export default function BallVotePage({ user }) {
       <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", border: "1px solid #e0e0e0", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", marginBottom: "20px" }}>
         <h3 style={{ margin: "0 0 20px 0", textAlign: "center", color: "#333", borderBottom: "2px solid #f0f0f0", paddingBottom: "10px" }}>{title}</h3>
 
-        {/* VALIDAÇÃO DE QUANTIDADE DE VOTOS */}
         {totalVotes === 0 ? (
           <div style={{ background: "#f8f9fa", border: "1px solid #e9ecef", borderRadius: "10px", padding: "12px", textAlign: "center", color: "#777", fontSize: "14px" }}>
             Nenhum voto registrado para este turno.
           </div>
         ) : (
           <>
-            {/* FAIXA COM TOTAL DE VOTOS */}
             <div style={{ background: "#f8f9fa", border: "1px solid #e9ecef", borderRadius: "10px", padding: "10px 12px", marginBottom: "20px", fontSize: "14px", color: "#444", textAlign: "center" }}>
               Total de votos registrados: <strong>{totalVotes}</strong>
             </div>
 
-            {/* --- DESTAQUE: VENCEDORES --- */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "25px" }}>
               <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #c3e6cb" }}>
                 <div style={{ fontSize: "10px", fontWeight: "bold", color: "#2f9e44", textTransform: "uppercase" }}>⚽ CHEIA</div>
@@ -407,24 +428,21 @@ export default function BallVotePage({ user }) {
               </div>
             </div>
 
-            {/* --- LISTAGEM COMPLETA --- */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-              {/* Coluna Cheia */}
               <div>
                 <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
                 {rankingCheia.map(r => (
                   <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
-                    <strong>{r.name}</strong> - <small>{r.team === 'A' ? 'Preto' : 'Verm'}</small> <strong>({r.total})</strong>
+                    <strong>{r.name}</strong> <strong>({r.total})</strong>
                   </div>
                 ))}
               </div>
 
-              {/* Coluna Murcha */}
               <div>
                 <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
                 {rankingMurcha.map(r => (
                   <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
-                    <strong>{r.name}</strong> - <small>{r.team === 'A' ? 'Preto' : 'Verm'}</small> <strong>({r.total})</strong>
+                    <strong>{r.name}</strong> <strong>({r.total})</strong>
                   </div>
                 ))}
               </div>
@@ -451,14 +469,12 @@ export default function BallVotePage({ user }) {
       {selectedMatchId && (
         <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
           
-          {/* SEÇÃO 1º TURNO */}
           <section>
             {currentRound === 1 && isVotingOpen 
               ? renderVotingArea(1) 
               : renderSummaryArea(1, "📊 Resultado 1º Turno")}
           </section>
 
-          {/* SEÇÃO 2º TURNO */}
           {(runoffCandidates.cheia.length > 1 || runoffCandidates.murcha.length > 1) && (
             <section>
               <hr style={{ border: "none", borderTop: "1px dashed #ccc", margin: "10px 0 25px 0" }} />

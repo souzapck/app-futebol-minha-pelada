@@ -1,3 +1,14 @@
+:root {
+  color-scheme: light only;
+}
+
+/* Garante que o ícone fique visível em qualquer navegador */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  filter: invert(0.8);
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

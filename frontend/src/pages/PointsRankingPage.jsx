@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { useGroup } from "../contexts/GroupContext";
 
 // Constantes de Tempo
 const DURACAO_T1 = 15 * 60 * 1000; 
@@ -18,13 +19,20 @@ export default function PointsRankingPage() {
   // Novo estado para saber se a partida selecionada ainda está rolando
   const [isOngoing, setIsOngoing] = useState(false);
 
+  const { activeGroup } = useGroup();
+
   useEffect(() => {
-    loadBaseData();
-  }, []);
+    if (activeGroup) {
+      loadBaseData();
+    }
+  }, [activeGroup]);
 
   useEffect(() => {
     if (matches.length > 0) {
       loadRanking();
+    } else if (!loading) {
+      // Se carregou e não tem matches, limpa o ranking
+      setRanking([]);
     }
   }, [mode, selectedMatchId, matches]);
 
@@ -34,6 +42,7 @@ export default function PointsRankingPage() {
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
       .select("*")
+      .eq("id_grupo", activeGroup.id_grupo) 
       .eq("is_drawn", true)
       .order("date", { ascending: false });
 
@@ -56,16 +65,31 @@ export default function PointsRankingPage() {
     setLoading(true);
     setIsOngoing(false);
 
-    const { data: playersData, error: playersError } = await supabase
-      .from("players")
-      .select("id, name, position, shirt_number")
-      .eq("is_hidden", false);
+    // === CORREÇÃO: Carrega os jogadores isolados por pelada via grupo_membros ===
+    const { data: membrosData, error: playersError } = await supabase
+      .from("grupo_membros")
+      .select(`
+        position, shirt_number,
+        players!inner(id, name)
+      `)
+      .eq("id_grupo", activeGroup.id_grupo)
+      .eq("is_hidden", false)
+      .neq("player_id", 1)
+      .eq("is_spectator", false); // Espectador não pontua
 
     if (playersError) {
       console.error("Erro ao carregar jogadores:", playersError);
       setLoading(false);
       return;
     }
+
+    // Achata os dados para o formato original
+    const playersData = (membrosData || []).map((m) => ({
+      id: m.players.id,
+      name: m.players.name,
+      position: m.position,
+      shirt_number: m.shirt_number
+    }));
 
     let matchesToUse = matches;
 
@@ -84,22 +108,7 @@ export default function PointsRankingPage() {
 
     // === TRAVA DE TEMPO (BLOQUEIO DA PARTIDA ATUAL) ===
     matchesToUse.forEach((match) => {
-      // Pega o índice real da partida na lista geral para saber se é a mais recente
-      const originalIndex = matches.findIndex(m => m.id === match.id);
- 
-      // === AMBIENTE DE TESTES ===
-      // Se for a partida mais recente (index 0), usa a data do seu teste.
-      // Se for uma partida antiga (index > 0), usa a data REAL dela para liberar no ranking.
- /*
-      let t1Start;
-      if (originalIndex === 0) {
-        t1Start = new Date("2026-04-26T02:25:00-03:00"); 
-      } else {
-        t1Start = new Date(`${match.date}T22:30:00-03:00`);
-      }
-*/
       // === AMBIENTE DE PRODUÇÃO ===
-      // Quando for subir oficial, apague o bloco IF/ELSE acima e deixe apenas esta linha:      
       const t1Start = new Date(`${match.date}T22:30:00-03:00`);
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);
       const t2Start = new Date(t1End.getTime() + INTERVALO);
@@ -121,6 +130,7 @@ export default function PointsRankingPage() {
 
     const matchIds = finishedMatches.map((m) => m.id);
 
+    // Usa IN nas consultas abaixo, já garantindo o isolamento da pelada, pois matchIds já são filtrados
     const { data: matchPlayersData, error: mpError } = await supabase
       .from("match_player")
       .select("*")
@@ -217,10 +227,10 @@ export default function PointsRankingPage() {
             (team === "B" && scoreB > scoreA);
 
           if (venceu) {
-            row.V += 1; // quantidade vitoria
-            row.PT += 3; // pontos por vitória
+            row.V += 1; 
+            row.PT += 3; 
           } else {
-            row.D += 1; // tabela mostra em quantidade vitória
+            row.D += 1; 
           }
         }
 
@@ -257,8 +267,8 @@ export default function PointsRankingPage() {
         if (total === maxCheia && maxCheia > 0) {
           const row = ensurePlayer(Number(playerId));
           if (!row) return;
-          row.BC += 1; // mostra na tabela qtd de bola cheia
-          row.PT += 0.5;  // soma 0,5 a cada bola cheia
+          row.BC += 1; 
+          row.PT += 0.5;  
         }
       });
 
@@ -266,8 +276,8 @@ export default function PointsRankingPage() {
         if (total === maxMurcha && maxMurcha > 0) {
           const row = ensurePlayer(Number(playerId));
           if (!row) return;
-          row.BM += 1; // mostra na tabela qtd de bola murcha
-          row.PT -= 0.5;  // diminui 0,5 a cada bola murcha
+          row.BM += 1; 
+          row.PT -= 0.5;  
         }
       });
     });
@@ -324,9 +334,7 @@ export default function PointsRankingPage() {
     };
   };
 
-  //aqui monta função para popup apenas da coluna PT
   const renderPointsTooltipPT = (jogador) => {
-    //const { vPts, ePts, dPts, gpPts, gcPts, bcPts, bmPts } = calcBreakdown(jogador);
     const breakdown = calcBreakdown(jogador);
 
     return (
@@ -369,9 +377,6 @@ export default function PointsRankingPage() {
     );
   };
   
-
-
-  //aqui monta função para popup das colunas de pontuação
   const renderColumnTooltip = (jogador, column) => {
     const breakdown = calcBreakdown(jogador);
 

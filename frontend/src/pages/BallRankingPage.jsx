@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { useGroup } from "../contexts/GroupContext";
 
 // Mesmas Constantes de Tempo da página de votação
 const DURACAO_T1 = 15 * 60 * 1000; 
@@ -11,18 +12,23 @@ export default function BallRankingPage() {
   const [rankingMurcha, setRankingMurcha] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const { activeGroup } = useGroup();
+
   useEffect(() => {
-    carregarRanking();
-  }, []);
+    if (activeGroup) {
+      carregarRanking();
+    }
+  }, [activeGroup]);
 
   const carregarRanking = async () => {
     setLoading(true);
 
-    // 1. Carrega os Jogos (Matches) - AGORA ORDENADOS POR DATA
+    // 1. Carrega os Jogos (Matches) isolados por pelada
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
       .select("*")
-      .order("date", { ascending: false }); // <--- ESSENCIAL para sabermos qual é a atual
+      .eq("id_grupo", activeGroup.id_grupo) 
+      .order("date", { ascending: false });
 
     if (matchesError) {
       console.error("Erro ao carregar partidas:", matchesError);
@@ -30,10 +36,11 @@ export default function BallRankingPage() {
       return;
     }
 
-    // 2. Carrega todos os votos
+    // 2. Carrega todos os votos isolados por pelada
     const { data: votesData, error: votesError } = await supabase
       .from("match_votes")
-      .select("*");
+      .select("*")
+      .eq("id_grupo", activeGroup.id_grupo); 
 
     if (votesError) {
       console.error("Erro ao carregar votos:", votesError);
@@ -41,11 +48,17 @@ export default function BallRankingPage() {
       return;
     }
 
-    // 3. Carrega os jogadores
-    const { data: playersData, error: playersError } = await supabase
-      .from("players")
-      .select("*")
-      .eq("is_hidden", false);
+    // 3. === CORREÇÃO: Carrega os jogadores isolados por pelada via grupo_membros ===
+    const { data: membrosData, error: playersError } = await supabase
+      .from("grupo_membros")
+      .select(`
+        position, shirt_number,
+        players!inner(id, name)
+      `)
+      .eq("id_grupo", activeGroup.id_grupo)
+      .eq("is_hidden", false)
+      .neq("player_id", 1)
+      .eq("is_spectator", false); // Espectador não entra no ranking
 
     if (playersError) {
       console.error("Erro ao carregar jogadores:", playersError);
@@ -53,26 +66,21 @@ export default function BallRankingPage() {
       return;
     }
 
+    // Achata os dados para o formato que a lógica abaixo já espera
+    const playersData = (membrosData || []).map((m) => ({
+      id: m.players.id,
+      name: m.players.name,
+      position: m.position,
+      shirt_number: m.shirt_number
+    }));
+
     const now = new Date();
     const partidasFinalizadasIds = new Set();
 
     // 4. Identifica quais partidas já terminaram a votação
-    (matchesData || []).forEach((match, index) => {
-
-      // === AMBIENTE DE TESTES ===
-      // Se for a partida mais recente (index 0), usa a data do seu teste.
-      // Se for uma partida antiga (index > 0), usa a data REAL dela para liberar no ranking.
- /*    
-      let t1Start;
-      if (index === 0) {
-        t1Start = new Date("2026-04-26T02:25:00-03:00"); 
-      } else {
-        t1Start = new Date(`${match.date}T22:30:00-03:00`);
-      }
-  */
+    (matchesData || []).forEach((match) => {
 
       // === AMBIENTE DE PRODUÇÃO ===
-      // Quando for subir oficial, apague o bloco IF/ELSE acima e deixe apenas esta linha:
       const t1Start = new Date(`${match.date}T22:30:00-03:00`);
 
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);

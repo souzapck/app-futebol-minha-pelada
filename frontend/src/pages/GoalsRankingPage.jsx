@@ -1,28 +1,67 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { useGroup } from "../contexts/GroupContext";
 
-export default function RankingPage() {
+export default function GoalsRankingPage() {
   const [ranking, setRanking] = useState([]);
+  
+  const { activeGroup } = useGroup();
 
   useEffect(() => {
-    carregarRanking();
-  }, []);
+    if (activeGroup) {
+      carregarRanking();
+    }
+  }, [activeGroup]);
 
   const carregarRanking = async () => {
     try {
-      const { data: playersData, error: playersError } = await supabase
-        .from("players")
-        .select("*")
-        .eq("is_hidden", false);
+      // 1. Traz os jogadores vinculados à pelada (sem espectadores)
+      const { data: membrosData, error: playersError } = await supabase
+        .from("grupo_membros")
+        .select(`
+          position, shirt_number,
+          players!inner(id, name)
+        `)
+        .eq("id_grupo", activeGroup.id_grupo) 
+        .eq("is_hidden", false)
+        .neq("player_id", 1)
+        .eq("is_spectator", false);
 
       if (playersError) {
         console.error("Erro ao carregar jogadores:", playersError);
         return;
       }
 
+      const playersData = (membrosData || []).map((m) => ({
+        id: m.players.id,
+        name: m.players.name,
+        position: m.position,
+        shirt_number: m.shirt_number
+      }));
+
+      // 2. Descobre quais são as partidas DESTA pelada para não misturar gols de outros grupos
+      const { data: matchesData, error: matchesError } = await supabase
+        .from("matches")
+        .select("id")
+        .eq("id_grupo", activeGroup.id_grupo);
+
+      if (matchesError) {
+        console.error("Erro ao carregar partidas:", matchesError);
+        return;
+      }
+
+      const matchIds = (matchesData || []).map(m => m.id);
+
+      if (matchIds.length === 0) {
+        setRanking([]);
+        return;
+      }
+
+      // 3. Trazemos as estatísticas APENAS dos jogos desta pelada
       const { data: matchPlayersData, error: matchPlayersError } = await supabase
         .from("match_player")
-        .select("*");
+        .select("*")
+        .in("match_id", matchIds);
 
       if (matchPlayersError) {
         console.error("Erro ao carregar estatísticas:", matchPlayersError);
@@ -89,7 +128,6 @@ export default function RankingPage() {
     <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
       <div
         style={{
-          
           background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
           padding: "10px",
           borderRadius: "12px",
@@ -102,7 +140,7 @@ export default function RankingPage() {
       >
         <h2 style={{ margin: 0, fontSize: "18px" }}>⚽ Artilharia Geral</h2>
         <p style={{ margin: "5px 0 0 0", opacity: 0.8 }}>
-          Ranking dos maiores matadores da Quinta-feira!
+          Ranking dos maiores matadores do nosso grupo!
         </p>
       </div>
 
@@ -168,7 +206,6 @@ export default function RankingPage() {
                       padding: "10px 6px",
                       fontWeight: index === 0 ? "bold" : "normal",
                       color: "#333"
-                      //width: "50%"
                     }}
                   >
                     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -222,7 +259,6 @@ export default function RankingPage() {
                   >
                     {jogador.media}
                   </td>
-                                    
                 </tr>
               ))}
             </tbody>

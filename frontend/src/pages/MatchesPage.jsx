@@ -1,44 +1,134 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { useGroup } from "../contexts/GroupContext"; 
 
-// Lembre-se de receber o 'user' aqui na primeira linha
+// Função inteligente para pegar o próximo dia de jogo do grupo
+const getNextMatchDate = (diaPreferido) => {
+  const hoje = new Date();
+  
+  // Função auxiliar para formatar a data na hora LOCAL (evita o bug do fuso horário do toISOString)
+  const formatLocal = (data) => {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, "0");
+    const dia = String(data.getDate()).padStart(2, "0");
+    return `${ano}-${mes}-${dia}`;
+  };
+
+  // Se o grupo não tiver dia configurado, sugere a data de hoje para não quebrar
+  if (!diaPreferido) return formatLocal(hoje);
+
+  // Mapa para entender o que vem do banco (aceita "Segunda", "terça-feira", "SABADO", etc)
+  const mapaDias = { 
+    "domingo": 0, "segunda": 1, "terca": 2, "quarta": 3, 
+    "quinta": 4, "sexta": 5, "sabado": 6 
+  };
+
+  // Limpa o texto que vier do banco (tira espaços extras, acentos, hífens e deixa minúsculo)
+  const diaLimpo = String(diaPreferido)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Tira acentos
+    .trim() // Tira espaços nas pontas
+    .split("-")[0] // Tira o "-feira" se tiver
+    .trim(); // Garante que não sobrou espaço
+
+  const targetDay = mapaDias[diaLimpo];
+
+  // Se o nome do dia vier esquisito e não bater com o mapa, devolve hoje
+  if (targetDay === undefined) return formatLocal(hoje);
+
+  let diff = targetDay - hoje.getDay();
+  if (diff < 0) {
+    diff += 7; // Se o dia já passou nesta semana, joga para a próxima semana
+  }
+
+  const proximaData = new Date(hoje);
+  proximaData.setDate(hoje.getDate() + diff);
+
+  return formatLocal(proximaData);
+};
+
+
 export default function MatchesPage({ user }) {
+  const { activeGroup, isAdmin } = useGroup(); 
+  const [newMatchDate, setNewMatchDate] = useState(
+    getNextMatchDate(activeGroup?.dia_jogo_grupo)
+  );
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [statusMap, setStatusMap] = useState({});
   const [shirtMap, setShirtMap] = useState({});
 
+  const [showNewMatchForm, setShowNewMatchForm] = useState(false);
+  
   useEffect(() => {
-    loadData();
-  }, []);
+    if (activeGroup) {
+      loadData();
+      setSelectedMatch(null); 
+      setStatusMap({});
+      setShirtMap({});
+      setShowNewMatchForm(false);
+      // === CORREÇÃO: Força o React a atualizar a data assim que o grupo carregar! ===
+      //setNewMatchDate(getNextMatchDate(activeGroup.dia_jogo_grupo));
+    }
+  }, [activeGroup]);
 
   const loadData = async () => {
-    const { data: matchesData, error: matchesError } = await supabase
-      .from("matches")
-      .select("*")
-      .order("date", { ascending: false });
+      // === 1. BUSCANDO O DIA DO JOGO DIRETO NA FONTE ===
+      const { data: grupoData } = await supabase
+        .from("grupos_pelada")
+        .select("dia_jogo_grupo")
+        .eq("id_grupo", activeGroup.id_grupo) // Nota: Se a sua coluna de ID primária no banco chamar apenas "id", troque "id_grupo" por "id" aqui!
+        .maybeSingle();
 
-    if (matchesError) {
-      console.error("Erro ao carregar partidas:", matchesError);
-      return;
-    }
+      if (grupoData && grupoData.dia_jogo_grupo) {
+        setNewMatchDate(getNextMatchDate(grupoData.dia_jogo_grupo));
+      } else {
+        setNewMatchDate(getNextMatchDate(null)); // Se não tiver nada no banco, bota hoje
+      }
+      // ==================================================
 
-    const { data: playersData, error: playersError } = await supabase
-      .from("players")
-      .select("*")
-      .eq("is_hidden", false)
-      .eq("is_spectator", false)
-      .order("name", { ascending: true });
+      const { data: matchesData, error: matchesError } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("id_grupo", activeGroup.id_grupo) 
+        .order("date", { ascending: false });
 
-    if (playersError) {
-      console.error("Erro ao carregar jogadores:", playersError);
-      return;
-    }
+      if (matchesError) {
+        console.error("Erro ao carregar partidas:", matchesError);
+        return;
+      }
 
-    setMatches(matchesData || []);
-    setPlayers(playersData || []);
-  };
+      const { data: membrosData, error: membrosError } = await supabase
+        .from("grupo_membros")
+        .select(`
+          position, rating, shirt_number, is_spectator, is_hidden,
+          players!inner(id, name)
+        `)
+        .eq("id_grupo", activeGroup.id_grupo) 
+        .eq("is_hidden", false)
+        .eq("is_spectator", false)
+        .neq("player_id", 1);
+
+      if (membrosError) {
+        console.error("Erro ao carregar jogadores:", membrosError);
+        return;
+      }
+
+      const playersList = (membrosData || [])
+        .map((m) => ({
+          id: m.players.id,
+          name: m.players.name,
+          position: m.position,
+          rating: m.rating,
+          shirt_number: m.shirt_number
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      setMatches(matchesData || []);
+      setPlayers(playersList);
+    };
 
   const loadConfirmations = async (matchId) => {
     const { data, error } = await supabase
@@ -54,13 +144,11 @@ export default function MatchesPage({ user }) {
     const novoStatusMap = {};
     const novoShirtMap = {};
 
-    // primeiro: carregar do match_player
     (data || []).forEach((item) => {
       novoStatusMap[item.player_id] = item.status;
       novoShirtMap[item.player_id] = item.shirt_number ?? "";
     });
 
-    // depois: preencher com número fixo se não tiver
     players.forEach((p) => {
       if (p.shirt_number && !novoShirtMap[p.id]) {
         novoShirtMap[p.id] = p.shirt_number;
@@ -75,23 +163,15 @@ export default function MatchesPage({ user }) {
     if (!selectedMatch) return;
 
     const player = players.find((p) => p.id === playerId);
-
-    // 🚫 bloqueia alteração se tem número fixo
     if (player?.shirt_number) return;
 
     const numberValue = value === "" ? null : Number(value);
 
-    if (
-      numberValue !== null &&
-      (Number.isNaN(numberValue) || numberValue < 0 || numberValue > 99)
-    ) {
+    if (numberValue !== null && (Number.isNaN(numberValue) || numberValue < 0 || numberValue > 99)) {
       return;
     }
 
-    setShirtMap((prev) => ({
-      ...prev,
-      [playerId]: value
-    }));
+    setShirtMap((prev) => ({ ...prev, [playerId]: value }));
 
     const { error } = await supabase
       .from("match_player")
@@ -102,9 +182,7 @@ export default function MatchesPage({ user }) {
           status: statusMap[playerId] ?? null,
           shirt_number: numberValue
         },
-        {
-          onConflict: "match_id,player_id"
-        }
+        { onConflict: "match_id,player_id" }
       );
 
     if (error) {
@@ -113,22 +191,16 @@ export default function MatchesPage({ user }) {
     }
   };
 
-  const getNextThursday = () => {
-    const d = new Date();
-    const day = d.getDay();
-    let diff = (4 - day + 7) % 7;
-    if (diff === 0 && d.getHours() >= 22) diff = 7;
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().slice(0, 10);
-  };
-
   const createMatch = async () => {
-    const nextThu = getNextThursday();
+    if (!newMatchDate) {
+      alert("⚠️ Selecione uma data para o jogo!");
+      return;
+    }
 
-    const matchExists = matches.some((m) => m.date === nextThu);
+    const matchExists = matches.some((m) => m.date === newMatchDate);
 
     if (matchExists) {
-      alert("⚠️ O jogo da próxima quinta-feira já foi criado!");
+      alert("⚠️ Já existe um jogo cadastrado para esta data!");
       return;
     }
 
@@ -136,7 +208,8 @@ export default function MatchesPage({ user }) {
       .from("matches")
       .insert([
         {
-          date: nextThu,
+          id_grupo: activeGroup.id_grupo, 
+          date: newMatchDate,
           is_drawn: false,
           score_a: 0,
           score_b: 0
@@ -146,26 +219,28 @@ export default function MatchesPage({ user }) {
       .single();
 
     if (error) {
-      alert("❌ Erro ao criar partida");
+      console.error("Detalhe do erro no banco:", error);
+      alert(`❌ Erro do Banco de Dados: ${error.message}`);
       return;
     }
 
-    // cria a base da partida para todos os jogadores elegíveis (não espectadores)
-    const { data: playersData, error: playersError } = await supabase
-      .from("players")
-      .select("id")
+    const { data: membrosData, error: membrosError } = await supabase
+      .from("grupo_membros")
+      .select("player_id")
+      .eq("id_grupo", activeGroup.id_grupo) 
       .eq("is_hidden", false)
-      .eq("is_spectator", false);
+      .eq("is_spectator", false)
+      .neq("player_id", 1);
 
-    if (playersError) {
-      console.error(playersError);
+    if (membrosError) {
+      console.error(membrosError);
       alert("❌ Partida criada, mas houve erro ao carregar jogadores.");
       return;
     }
 
-    const matchPlayerRows = (playersData || []).map((player) => ({
+    const matchPlayerRows = (membrosData || []).map((membro) => ({
       match_id: data.id,
-      player_id: player.id,
+      player_id: membro.player_id,
       status: null,
       team: null,
       goals: 0,
@@ -188,6 +263,9 @@ export default function MatchesPage({ user }) {
     const newMatches = [data, ...matches];
     setMatches(newMatches);
     selectMatch(data);
+    
+    setShowNewMatchForm(false);
+    setNewMatchDate(getNextMatchDate(activeGroup?.dia_jogo_grupo));
   };
 
   const deleteMatch = async (matchId) => {
@@ -196,9 +274,7 @@ export default function MatchesPage({ user }) {
       return;
     }
 
-    const confirmDelete = window.confirm(
-      "🗑️ Tem certeza que deseja excluir este jogo? Todos os dados serão apagados."
-    );
+    const confirmDelete = window.confirm("🗑️ Tem certeza que deseja excluir este jogo? Todos os dados serão apagados.");
     if (!confirmDelete) return;
 
     try {
@@ -234,23 +310,19 @@ export default function MatchesPage({ user }) {
 
   const confirmPlayer = async (playerId, status) => {
     if (!selectedMatch) return;
-
     if (selectedMatch.is_drawn) {
       alert("🔒 Jogo fechado! Não é mais possível alterar presenças.");
       return;
     }
-
-    if (!user?.is_admin && user?.player_id !== playerId) {
+    
+    if (!isAdmin && user?.player_id !== playerId) {
       alert("⚠️ Você só pode alterar a sua própria presença.");
       return;
     }
 
     setStatusMap((prev) => ({ ...prev, [playerId]: status }));
 
-    const shirtNumberValue =
-      shirtMap[playerId] === "" || shirtMap[playerId] === undefined
-        ? null
-        : Number(shirtMap[playerId]);
+    const shirtNumberValue = shirtMap[playerId] === "" || shirtMap[playerId] === undefined ? null : Number(shirtMap[playerId]);
 
     const { error } = await supabase
       .from("match_player")
@@ -261,9 +333,7 @@ export default function MatchesPage({ user }) {
           status: status,
           shirt_number: shirtNumberValue
         },
-        {
-          onConflict: "match_id,player_id"
-        }
+        { onConflict: "match_id,player_id" }
       );
 
     if (error) {
@@ -273,84 +343,69 @@ export default function MatchesPage({ user }) {
   };
 
   const playersWithStatus = players.map((p) => {
-    return {
-      ...p,
-      status: statusMap[p.id] || "sem_resposta"
-    };
+    return { ...p, status: statusMap[p.id] || "sem_resposta" };
   });
 
-  const statusWeight = {
-    confirmado: 1,
-    sem_resposta: 2,
-    duvida: 3,
-    nao_vai: 4
-  };
+  const statusWeight = { confirmado: 1, sem_resposta: 2, duvida: 3, nao_vai: 4 };
 
   playersWithStatus.sort((a, b) => {
-    // 1º Regra: O jogador logado sempre ganha a disputa e vai pro topo
     if (a.id === user?.player_id) return -1;
     if (b.id === user?.player_id) return 1;
-
-    // 2º Regra: O resto da lista é ordenado pelo status
     return statusWeight[a.status] - statusWeight[b.status];
   });
 
-  const totalConfirmed = playersWithStatus.filter(
-    (p) => p.status === "confirmado"
-  ).length;
+  const totalConfirmed = playersWithStatus.filter((p) => p.status === "confirmado").length;
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "40px" }}>
-      {/* SÓ MOSTRA O BOTÃO DE CRIAR JOGO SE FOR ADMIN */}
-      {user?.is_admin && (
-        <button
-          onClick={createMatch}
-          style={{
-            width: "100%",
-            padding: "16px",
-            background: "#28a745",
-            color: "white",
-            fontSize: "16px",
-            fontWeight: "bold",
-            border: "none",
-            borderRadius: "10px",
-            cursor: "pointer",
-            marginBottom: 20,
-            boxShadow: "0 4px 10px rgba(40,167,69,0.3)"
-          }}
-        >
-          📅 + Criar Jogo (Próx. Quinta)
-        </button>
+      
+      {isAdmin && (
+        <div style={{ marginBottom: 20 }}>
+          {!showNewMatchForm ? (
+            <button
+              onClick={() => setShowNewMatchForm(true)}
+              style={{ width: "100%", padding: "16px", background: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", border: "none", borderRadius: "10px", cursor: "pointer", boxShadow: "0 4px 10px rgba(40,167,69,0.3)" }}
+            >
+              📅 + Novo Jogo
+            </button>
+          ) : (
+            <div style={{ background: "#f8f9fa", padding: "15px", borderRadius: "12px", border: "1px solid #ddd", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ textAlign: "left" }}>
+                <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>
+                  Data do Jogo:
+                </label>
+                <input
+                  type="date"
+                  value={newMatchDate}
+                  onChange={(e) => setNewMatchDate(e.target.value)}
+                  style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "15px", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={createMatch}
+                  style={{ flex: 1, padding: "12px", background: "#28a745", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                >
+                  ✅ Confirmar Criação
+                </button>
+                <button
+                  onClick={() => setShowNewMatchForm(false)}
+                  style={{ padding: "12px", background: "#6c757d", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      <div
-        style={{
-          //display: "flex",
-          maxWidth: "600px",
-          gap: "10px",
-          overflowX: "auto",
-          paddingBottom: "10px",
-          marginBottom: "20px"
-        }}
-      >
+      <div style={{ maxWidth: "600px", gap: "10px", overflowX: "auto", paddingBottom: "10px", marginBottom: "20px" }}>
         {matches.map((m) => (
           <button
             key={m.id}
             onClick={() => selectMatch(m)}
-            style={{
-              marginBottom: "5px",
-              marginInline: "3px",
-              padding: "12px",
-              borderRadius: "15px",
-              cursor: "pointer",
-              border:
-                selectedMatch?.id === m.id
-                  ? "2px solid #007bff"
-                  : "1px solid #ddd",
-              background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff",
-              color: selectedMatch?.id === m.id ? "#007bff" : "#555",
-              fontWeight: selectedMatch?.id === m.id ? "bold" : "normal"
-            }}
+            style={{ marginBottom: "5px", marginInline: "3px", padding: "12px", borderRadius: "15px", cursor: "pointer", border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd", background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff", color: selectedMatch?.id === m.id ? "#007bff" : "#555", fontWeight: selectedMatch?.id === m.id ? "bold" : "normal" }}
           >
             {m.date.split("-").reverse().join("/")} {m.is_drawn && "🔒"}
           </button>
@@ -358,73 +413,17 @@ export default function MatchesPage({ user }) {
       </div>
 
       {selectedMatch && (
-        <div
-          style={{
-            background: "#f8f9fa",
-            borderRadius: "12px",
-            padding: "5px",
-            border: "1px solid #eee"
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "15px",
-              flexWrap: "wrap",
-              gap: "8px"
-            }}
-          >
+        <div style={{ background: "#f8f9fa", borderRadius: "12px", padding: "5px", border: "1px solid #eee" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexWrap: "wrap", gap: "8px" }}>
             <h3 style={{ margin: 0, color: "#333" }}>Presença</h3>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "6px",
-                alignItems: "center",
-                flexWrap: "wrap"
-              }}
-            >
-              <div
-                style={{
-                  background:
-                    totalConfirmed >= 12
-                      ? "#28a745"
-                      : totalConfirmed >= 10
-                      ? "#ffc107"
-                      : "#dc3545",
-                  color:
-                    totalConfirmed >= 10 && totalConfirmed < 12
-                      ? "black"
-                      : "white",
-                  padding: "4px 10px",
-                  borderRadius: "20px",
-                  fontWeight: "bold",
-                  fontSize: "12px",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                }}
-              >
+            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ background: totalConfirmed >= 12 ? "#28a745" : totalConfirmed >= 10 ? "#ffc107" : "#dc3545", color: totalConfirmed >= 10 && totalConfirmed < 12 ? "black" : "white", padding: "4px 10px", borderRadius: "20px", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
                 Confirmados: {totalConfirmed}
               </div>
 
-              {/* SÓ MOSTRA O BOTÃO DE EXCLUIR JOGO SE FOR ADMIN */}
-              {user?.is_admin && !selectedMatch?.is_drawn && (
-                <button
-                  onClick={() => deleteMatch(selectedMatch.id)}
-                  style={{
-                    background: "#dc3545",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "5px 8px",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    fontSize: "12px",
-                    whiteSpace: "nowrap"
-                  }}
-                >
+              {isAdmin && !selectedMatch?.is_drawn && (
+                <button onClick={() => deleteMatch(selectedMatch.id)} style={{ background: "#dc3545", color: "white", border: "none", borderRadius: "8px", padding: "5px 8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap" }}>
                   🗑️ Excluir
                 </button>
               )}
@@ -433,97 +432,24 @@ export default function MatchesPage({ user }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {playersWithStatus.map((p) => {
-              const bloqueadoParaEsteUsuario =
-                !user?.is_admin && user?.player_id !== p.id;
+              const bloqueadoParaEsteUsuario = !isAdmin && user?.player_id !== p.id;
               const hasFixedNumber = !!p.shirt_number;
 
               return (
-                <div
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    background: "#fff",
-                    padding: "12px",
-                    borderRadius: "10px",
-                    borderLeft: `6px solid ${
-                      p.status === "confirmado"
-                        ? "#28a745"
-                        : p.status === "nao_vai"
-                        ? "#dc3545"
-                        : p.status === "duvida"
-                        ? "#ffc107"
-                        : "#ddd"
-                    }`,
-                    boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-                    opacity: selectedMatch.is_drawn ? 0.7 : 1
-                  }}
-                >
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", padding: "12px", borderRadius: "10px", borderLeft: `6px solid ${p.status === "confirmado" ? "#28a745" : p.status === "nao_vai" ? "#dc3545" : p.status === "duvida" ? "#ffc107" : "#ddd"}`, boxShadow: "0 2px 5px rgba(0,0,0,0.05)", opacity: selectedMatch.is_drawn ? 0.7 : 1 }}>
                   <div>
-                    <div
-                      style={{
-                        textAlign: "left",
-                        fontWeight: "bold",
-                        fontSize: "16px",
-                        color: "#333"
-                      }}
-                    >
+                    <div style={{ textAlign: "left", fontWeight: "bold", fontSize: "16px", color: "#333" }}>
                       {p.name}
-
                       {user?.player_id === p.id && (
-                        <span
-                          style={{
-                            fontSize: "11px",
-                            color: "#28a745",
-                            background: "#e8f5e9",
-                            padding: "2px 6px",
-                            borderRadius: "10px",
-                            marginLeft: "8px",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px"
-                          }}
-                        >
+                        <span style={{ fontSize: "11px", color: "#28a745", background: "#e8f5e9", padding: "2px 6px", borderRadius: "10px", marginLeft: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                           Você
                         </span>
                       )}
                     </div>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginTop: "6px",
-                        flexWrap: "wrap"
-                      }}
-                    >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
                       <span>👕</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="99"
-                        value={shirtMap[p.id] ?? ""}
-                        onChange={(e) => updateShirtNumber(p.id, e.target.value)}
-                        disabled={
-                          selectedMatch.is_drawn ||
-                          bloqueadoParaEsteUsuario ||
-                          hasFixedNumber
-                        }
-                        style={{
-                          width: "48px",
-                          padding: "4px",
-                          textAlign: "center",
-                          borderRadius: "6px",
-                          border: "1px solid #ccc",
-                          color: hasFixedNumber ? "#666" : "#007bff",
-                          fontWeight: "bold",
-                          fontSize: "13px",
-                          backgroundColor: hasFixedNumber ? "#e9ecef" : "#fff"
-                        }}
-                        title={hasFixedNumber ? "Número fixo" : "Número da camisa"}
-                      />
-
+                      <input type="number" min="0" max="99" value={shirtMap[p.id] ?? ""} onChange={(e) => updateShirtNumber(p.id, e.target.value)} disabled={selectedMatch.is_drawn || bloqueadoParaEsteUsuario || hasFixedNumber} style={{ width: "48px", padding: "4px", textAlign: "center", borderRadius: "6px", border: "1px solid #ccc", color: hasFixedNumber ? "#666" : "#007bff", fontWeight: "bold", fontSize: "13px", backgroundColor: hasFixedNumber ? "#e9ecef" : "#fff" }} title={hasFixedNumber ? "Número fixo" : "Número da camisa"} />
                       <span style={{ fontSize: "12px", color: "#888" }}>
                         ⚽ {p.position} | ⭐ {p.rating}
                       </span>
@@ -531,68 +457,9 @@ export default function MatchesPage({ user }) {
                   </div>
 
                   <div style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      onClick={() => confirmPlayer(p.id, "confirmado")}
-                      disabled={selectedMatch.is_drawn || bloqueadoParaEsteUsuario}
-                      style={{
-                        padding: "8px 12px",
-                        background:
-                          p.status === "confirmado" ? "#28a745" : "#f1f3f5",
-                        color: p.status === "confirmado" ? "white" : "#555",
-                        border: "none",
-                        borderRadius: "6px",
-                        fontWeight: "bold",
-                        cursor:
-                          selectedMatch.is_drawn || bloqueadoParaEsteUsuario
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity: bloqueadoParaEsteUsuario ? 0.4 : 1
-                      }}
-                    >
-                      Vai
-                    </button>
-
-                    <button
-                      onClick={() => confirmPlayer(p.id, "nao_vai")}
-                      disabled={selectedMatch.is_drawn || bloqueadoParaEsteUsuario}
-                      style={{
-                        padding: "8px 12px",
-                        background:
-                          p.status === "nao_vai" ? "#dc3545" : "#f1f3f5",
-                        color: p.status === "nao_vai" ? "white" : "#555",
-                        border: "none",
-                        borderRadius: "6px",
-                        fontWeight: "bold",
-                        cursor:
-                          selectedMatch.is_drawn || bloqueadoParaEsteUsuario
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity: bloqueadoParaEsteUsuario ? 0.4 : 1
-                      }}
-                    >
-                      Não
-                    </button>
-
-                    <button
-                      onClick={() => confirmPlayer(p.id, "duvida")}
-                      disabled={selectedMatch.is_drawn || bloqueadoParaEsteUsuario}
-                      style={{
-                        padding: "8px",
-                        background:
-                          p.status === "duvida" ? "#ffc107" : "#f1f3f5",
-                        color: p.status === "duvida" ? "black" : "#555",
-                        border: "none",
-                        borderRadius: "6px",
-                        fontSize: "14px",
-                        cursor:
-                          selectedMatch.is_drawn || bloqueadoParaEsteUsuario
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity: bloqueadoParaEsteUsuario ? 0.4 : 1
-                      }}
-                    >
-                      ❓
-                    </button>
+                    <button onClick={() => confirmPlayer(p.id, "confirmado")} disabled={selectedMatch.is_drawn || bloqueadoParaEsteUsuario} style={{ padding: "8px 12px", background: p.status === "confirmado" ? "#28a745" : "#f1f3f5", color: p.status === "confirmado" ? "white" : "#555", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: selectedMatch.is_drawn || bloqueadoParaEsteUsuario ? "not-allowed" : "pointer", opacity: bloqueadoParaEsteUsuario ? 0.4 : 1 }}>Vai</button>
+                    <button onClick={() => confirmPlayer(p.id, "nao_vai")} disabled={selectedMatch.is_drawn || bloqueadoParaEsteUsuario} style={{ padding: "8px 12px", background: p.status === "nao_vai" ? "#dc3545" : "#f1f3f5", color: p.status === "nao_vai" ? "white" : "#555", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: selectedMatch.is_drawn || bloqueadoParaEsteUsuario ? "not-allowed" : "pointer", opacity: bloqueadoParaEsteUsuario ? 0.4 : 1 }}>Não</button>
+                    <button onClick={() => confirmPlayer(p.id, "duvida")} disabled={selectedMatch.is_drawn || bloqueadoParaEsteUsuario} style={{ padding: "8px", background: p.status === "duvida" ? "#ffc107" : "#f1f3f5", color: p.status === "duvida" ? "black" : "#555", border: "none", borderRadius: "6px", fontSize: "14px", cursor: selectedMatch.is_drawn || bloqueadoParaEsteUsuario ? "not-allowed" : "pointer", opacity: bloqueadoParaEsteUsuario ? 0.4 : 1 }}>❓</button>
                   </div>
                 </div>
               );
