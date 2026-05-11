@@ -132,7 +132,14 @@ export default function BallVotePage({ user }) {
       }
 
       const now = new Date();
-      const t1Start = new Date(`${match.date}T22:30:00-03:00`); 
+      
+      // === ATUALIZAÇÃO: Horário dinâmico baseado no grupo + 90 minutos ===
+      const horaJogo = activeGroup?.hora_jogo_grupo || "22:30:00"; // Fallback para 22:30 caso esteja vazio
+      const matchStart = new Date(`${match.date}T${horaJogo}-03:00`); 
+      
+      // Adiciona 90 minutos (90 * 60 * 1000 milissegundos) ao horário do jogo
+      const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000); 
+      
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);
       const t2Start = new Date(t1End.getTime() + INTERVALO);
       const t2End = new Date(t2Start.getTime() + DURACAO_T2);
@@ -141,7 +148,9 @@ export default function BallVotePage({ user }) {
         setTimeLeft("Aguardando fechamento da partida...");
         setIsVotingOpen(false);
       } else if (now < t1Start) {
-        setTimeLeft(`Aguarde, início da votação às 22:30!`);
+        // Mostra a hora exata formatada em que a votação vai abrir
+        const horaAbertura = t1Start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        setTimeLeft(`Aguarde, início da votação às ${horaAbertura}!`);
         setIsVotingOpen(false);
       } else if (now <= t1End) {
         if (currentRound !== 1) {
@@ -180,7 +189,7 @@ export default function BallVotePage({ user }) {
     const interval = setInterval(updateTimer, 1000);
     updateTimer();
     return () => clearInterval(interval);
-  }, [selectedMatchId, matches, currentRound, runoffCandidates]);
+  }, [selectedMatchId, matches, currentRound, runoffCandidates, activeGroup]);
 
   const getRunoffCandidates = (votesT1) => {
     const counts = votesT1.reduce((acc, v) => {
