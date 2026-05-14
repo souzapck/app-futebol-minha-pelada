@@ -36,16 +36,19 @@ export default function AdminRequestsPage() {
     try {
       const phoneNormalizado = req.telefone_usuario.replace(/\D/g, "");
 
-      // 1. Criar o novo Grupo (Pelada)
+      // 1. Criar o novo Grupo (Pelada) JÁ COM O DIA E HORA
       const { data: newGroup, error: groupError } = await supabase
         .from("grupos_pelada")
-        .insert([{ nome_grupo: req.nome_pelada }])
+        .insert([{ 
+          nome_grupo: req.nome_pelada,
+          dia_jogo_grupo: req.dia_jogo,      
+          hora_jogo_grupo: req.hora_jogo     
+        }])
         .select()
         .single();
 
       if (groupError) throw groupError;
 
-      // Pegamos o ID da pelada que acabou de nascer!
       const novoGrupoId = newGroup.id_grupo || newGroup.id; 
 
       // 2. Verificar se o Responsável já existe na base global
@@ -59,7 +62,7 @@ export default function AdminRequestsPage() {
       if (existingPlayer) {
         finalPlayerId = existingPlayer.id;
       } else {
-        // 3. Se não existe, cria na tabela global (sem id_grupo!)
+        // 3. Se não existe, cria na tabela global
         const { data: createdPlayer, error: playerError } = await supabase
           .from("players")
           .insert([{ name: req.nome_responsavel, phone: phoneNormalizado }])
@@ -69,7 +72,6 @@ export default function AdminRequestsPage() {
         if (playerError) throw playerError;
         finalPlayerId = createdPlayer.id;
 
-        // Cria o login base (Senha = 4 últimos dígitos)
         const senhaPadrao = phoneNormalizado.slice(-4);
         await supabase.from("users").insert([{
           phone: phoneNormalizado,
@@ -85,7 +87,7 @@ export default function AdminRequestsPage() {
         .insert([{
           id_grupo: novoGrupoId,
           player_id: finalPlayerId,
-          perfil: 'admin' // Dá os poderes de dono da pelada pra ele!
+          perfil: 'admin'
         }]);
 
       if (membroError) throw membroError;
@@ -140,13 +142,13 @@ export default function AdminRequestsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px" }}>
+    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: "40px", padding: "0 10px", boxSizing: "border-box" }}>
       <div style={{ background: "#fff", padding: "20px", borderRadius: "12px", border: "2px solid #ffc107", boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
-        <h2 style={{ marginTop: 0, color: "#333", display: "flex", alignItems: "center", gap: "10px" }}>
+        <h2 style={{ marginTop: 0, color: "#333", display: "flex", alignItems: "center", gap: "10px", fontSize: "1.2rem", flexWrap: "wrap" }}>
           👑 Painel Master: Novas Assinaturas
         </h2>
         <p style={{ color: "#666", fontSize: "14px", marginBottom: "20px" }}>
-          Abaixo estão os formulários enviados pela tela de login. Ao aprovar, o sistema irá montar todo o banco de dados do cliente automaticamente.
+          Ao aprovar, o sistema irá montar todo o banco de dados do cliente com o dia e hora escolhidos.
         </p>
 
         {requests.length === 0 ? (
@@ -154,42 +156,69 @@ export default function AdminRequestsPage() {
             Nenhuma solicitação pendente no momento.
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {requests.map((req) => (
-              <div key={req.id} style={{ background: "#f8f9fa", border: "1px solid #ddd", borderRadius: "10px", padding: "15px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px" }}>
+              <div key={req.id} style={{ background: "#f8f9fa", border: "1px solid #ddd", borderRadius: "10px", padding: "15px", display: "flex", flexDirection: "column", gap: "15px" }}>
                 
-                <div>
-                  <div style={{ fontWeight: "bold", fontSize: "18px", color: "#007bff", marginBottom: "5px" }}>
-                    ⚽ {req.nome_pelada}
+                {/* Cabeçalho do Card */}
+                <div style={{ fontWeight: "bold", fontSize: "18px", color: "#007bff", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>
+                  ⚽ {req.nome_pelada}
+                </div>
+                
+                {/* Informações Empilhadas para Mobile */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "14px", color: "#333" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: "bold", width: "100px", flexShrink: 0 }}>Resp:</span> 
+                    <span style={{ wordBreak: "break-word" }}>{req.nome_responsavel}</span>
                   </div>
-                  <div style={{ fontSize: "14px", color: "#333", marginBottom: "3px" }}>
-                    <strong>Responsável:</strong> {req.nome_responsavel}
+                  <div style={{ display: "flex", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: "bold", width: "100px", flexShrink: 0 }}>WhatsApp:</span> 
+                    <span>{formatarTel(req.telefone_usuario)}</span>
                   </div>
-                  <div style={{ fontSize: "14px", color: "#333" }}>
-                    <strong>WhatsApp:</strong> {formatarTel(req.telefone_usuario)}
+                  <div style={{ display: "flex", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: "bold", width: "100px", flexShrink: 0 }}>E-mail:</span> 
+                    <span style={{ wordBreak: "break-all" }}>{req.email || "Não informado"}</span>
                   </div>
-                  <div style={{ fontSize: "11px", color: "#999", marginTop: "5px" }}>
-                    Solicitado em: {new Date(req.created_at).toLocaleDateString("pt-BR")} às {new Date(req.created_at).toLocaleTimeString("pt-BR")}
+                  <div style={{ display: "flex", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: "bold", width: "100px", flexShrink: 0 }}>Jogo:</span> 
+                    <span>
+                      {req.dia_jogo || "Não definido"} 
+                      {req.hora_jogo ? ` às ${req.hora_jogo.slice(0, 5)}` : ""}
+                    </span>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button
-                    onClick={() => handleRecusar(req.id)}
-                    disabled={processingId === req.id}
-                    style={{ background: "#fff", color: "#dc3545", border: "1px solid #dc3545", padding: "10px 15px", borderRadius: "8px", cursor: processingId ? "not-allowed" : "pointer", fontWeight: "bold" }}
-                  >
-                    ❌ Recusar
-                  </button>
-                  
+                {/* Observação (Se existir) */}
+                {req.observacao && (
+                  <div style={{ background: "#fff", border: "1px dashed #ccc", padding: "10px", borderRadius: "6px", fontSize: "13px", color: "#555", marginTop: "5px" }}>
+                    <strong style={{ display: "block", marginBottom: "5px" }}>📝 Observações:</strong> 
+                    <span style={{ wordBreak: "break-word" }}>{req.observacao}</span>
+                  </div>
+                )}
+
+                <div style={{ fontSize: "11px", color: "#999", borderTop: "1px solid #eee", paddingTop: "10px" }}>
+                  Recebido em: {new Date(req.created_at).toLocaleDateString("pt-BR")} às {new Date(req.created_at).toLocaleTimeString("pt-BR")}
+                </div>
+
+                {/* Botões - Empilham em telas muito pequenas */}
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "5px" }}>
                   <button
                     onClick={() => handleAprovar(req)}
                     disabled={processingId === req.id}
-                    style={{ background: "#28a745", color: "#fff", border: "none", padding: "10px 15px", borderRadius: "8px", cursor: processingId ? "not-allowed" : "pointer", fontWeight: "bold", boxShadow: "0 2px 5px rgba(40,167,69,0.3)" }}
+                    style={{ flex: "1 1 120px", background: "#28a745", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", cursor: processingId ? "not-allowed" : "pointer", fontWeight: "bold", boxShadow: "0 2px 5px rgba(40,167,69,0.3)" }}
                   >
-                    {processingId === req.id ? "⏳ Gerando..." : "✅ Aprovar e Criar"}
+                    {processingId === req.id ? "⏳ Gerando..." : "✅ Aprovar"}
+                  </button>
+
+                  <button
+                    onClick={() => handleRecusar(req.id)}
+                    disabled={processingId === req.id}
+                    style={{ flex: "1 1 120px", background: "#fff", color: "#dc3545", border: "1px solid #dc3545", padding: "12px", borderRadius: "8px", cursor: processingId ? "not-allowed" : "pointer", fontWeight: "bold" }}
+                  >
+                    ❌ Recusar
                   </button>
                 </div>
+
               </div>
             ))}
           </div>
