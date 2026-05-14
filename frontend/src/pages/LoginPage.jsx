@@ -23,6 +23,10 @@ export default function LoginPage({ onLoginSuccess }) {
   const [reqPhone, setReqPhone] = useState("");
   const [reqName, setReqName] = useState("");
   const [reqGroup, setReqGroup] = useState("");
+  const [reqEmail, setReqEmail] = useState("");
+  const [reqDay, setReqDay] = useState("");
+  const [reqTime, setReqTime] = useState("");
+  const [reqObs, setReqObs] = useState("");
 
   // Estados Globais da tela
   const [erro, setErro] = useState("");
@@ -63,7 +67,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
       if (!allGroupsError && allGroups) {
         finalUserGroups = allGroups.map((g) => ({
-          ...g, // <--- A MÁGICA É AQUI! Isso copia TODAS as colunas do banco (incluindo a foto!)
+          ...g, // Copia TODAS as colunas do banco (incluindo a foto!)
           id_grupo: g.id || g.id_grupo,
           nome_grupo: g.nome_grupo,
           perfil: "admin" // Master tem poder de Admin em todas
@@ -102,8 +106,8 @@ export default function LoginPage({ onLoginSuccess }) {
       setErro("❌ Digite um celular com DDD e 11 números.");
       return;
     }
-    if (!reqName.trim() || !reqGroup.trim()) {
-      setErro("❌ Preencha todos os campos.");
+    if (!reqName.trim() || !reqGroup.trim() || !reqEmail.trim() || !reqDay || !reqTime) {
+      setErro("❌ Preencha todos os campos obrigatórios.");
       return;
     }
 
@@ -131,7 +135,11 @@ export default function LoginPage({ onLoginSuccess }) {
         .insert({
           telefone_usuario: reqPhone,
           nome_responsavel: reqName,
-          nome_pelada: reqGroup
+          nome_pelada: reqGroup,
+          email: reqEmail,
+          dia_jogo: reqDay,
+          hora_jogo: reqTime,
+          observacao: reqObs
         });
 
       if (error) throw error;
@@ -143,6 +151,16 @@ export default function LoginPage({ onLoginSuccess }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetRequestForm = () => {
+    setReqPhone("");
+    setReqGroup("");
+    setReqName("");
+    setReqEmail("");
+    setReqDay("");
+    setReqTime("");
+    setReqObs("");
   };
 
   const inputStyle = {
@@ -158,8 +176,17 @@ export default function LoginPage({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "50px auto", padding: "20px", textAlign: "center", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ maxWidth: "450px", margin: "50px auto", padding: "20px", textAlign: "center", fontFamily: "Arial, sans-serif" }}>
       
+      <style>
+        {`
+          .time-input-dark-icon::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+          }
+        `}
+      </style>
+
       <div style={{ background: "#fff", padding: "30px", borderRadius: "12px", boxShadow: "0 4px 15px rgba(0,0,0,0.1)", border: "1px solid #eaeaea" }}>
         
         {erro && (
@@ -245,7 +272,7 @@ export default function LoginPage({ onLoginSuccess }) {
             <form onSubmit={handleRequestGroup} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
               
               <div style={{ textAlign: "left" }}>
-                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Seu Nome</label>
+                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Seu Nome *</label>
                 <input
                   type="text"
                   placeholder="Ex: João Silva"
@@ -257,7 +284,36 @@ export default function LoginPage({ onLoginSuccess }) {
               </div>
 
               <div style={{ textAlign: "left" }}>
-                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Nome da Pelada</label>
+                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Seu Celular (WhatsApp) *</label>
+                <input
+                  type="tel"
+                  placeholder="(48) 98765-4321"
+                  value={formatPhone(reqPhone)}
+                  onChange={(e) => setReqPhone(normalizePhone(e.target.value))}
+                  required
+                  maxLength={15}
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={{ textAlign: "left" }}>
+                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>E-mail *</label>
+                <input
+                  type="email"
+                  placeholder="Ex: seuemail@dominio.com"
+                  value={reqEmail}
+                  onChange={(e) => setReqEmail(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={{ textAlign: "left", marginTop: "10px", paddingBottom: "5px", borderBottom: "1px dashed #ccc" }}>
+                <span style={{ fontSize: "14px", fontWeight: "bold", color: "#007bff" }}>⚽ Dados do Jogo</span>
+              </div>
+
+              <div style={{ textAlign: "left" }}>
+                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Nome da Pelada *</label>
                 <input
                   type="text"
                   placeholder="Ex: Futebol de Quinta"
@@ -268,16 +324,42 @@ export default function LoginPage({ onLoginSuccess }) {
                 />
               </div>
 
+              <div style={{ display: "flex", gap: "15px", width: "100%" }}>
+                <div style={{ flex: "2 1 0", textAlign: "left", minWidth: 0 }}>
+                  <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana *</label>
+                  <select value={reqDay} onChange={(e) => setReqDay(e.target.value)} required style={inputStyle}>
+                    <option value="">Selecione...</option>
+                    <option value="Domingo">Domingo</option>
+                    <option value="Segunda-feira">Segunda-feira</option>
+                    <option value="Terça-feira">Terça-feira</option>
+                    <option value="Quarta-feira">Quarta-feira</option>
+                    <option value="Quinta-feira">Quinta-feira</option>
+                    <option value="Sexta-feira">Sexta-feira</option>
+                    <option value="Sábado">Sábado</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: "1 1 0", textAlign: "left", minWidth: 0 }}>
+                  <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Hora *</label>
+                  <input
+                    type="time"
+                    className="time-input-dark-icon"
+                    value={reqTime}
+                    onChange={(e) => setReqTime(e.target.value)}
+                    required
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
               <div style={{ textAlign: "left" }}>
-                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Seu Celular (WhatsApp)</label>
-                <input
-                  type="tel"
-                  placeholder="(48) 98765-4321"
-                  value={formatPhone(reqPhone)}
-                  onChange={(e) => setReqPhone(normalizePhone(e.target.value))}
-                  required
-                  maxLength={15}
-                  style={inputStyle}
+                <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Observações (Opcional)</label>
+                <textarea
+                  placeholder="Ex: Quadra coberta, society, precisamos de goleiro..."
+                  value={reqObs}
+                  onChange={(e) => setReqObs(e.target.value)}
+                  rows="3"
+                  style={{ ...inputStyle, resize: "vertical" }}
                 />
               </div>
 
@@ -303,7 +385,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
             <div style={{ marginTop: "20px" }}>
               <button 
-                onClick={() => { setView("login"); setErro(""); }}
+                onClick={() => { setView("login"); setErro(""); resetRequestForm(); }}
                 style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "14px", textDecoration: "underline" }}
               >
                 Voltar para o Login
@@ -324,7 +406,7 @@ export default function LoginPage({ onLoginSuccess }) {
             </div>
             
             <button 
-              onClick={() => { setView("login"); setReqPhone(""); setReqGroup(""); setReqName(""); }}
+              onClick={() => { setView("login"); resetRequestForm(); }}
               style={{ background: "#f8f9fa", border: "1px solid #ccc", padding: "10px 20px", borderRadius: "8px", color: "#333", cursor: "pointer", fontWeight: "bold" }}
             >
               Voltar ao Início
