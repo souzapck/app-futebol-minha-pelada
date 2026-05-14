@@ -167,9 +167,9 @@ export default function GroupSettingsPage({ user }) {
             <input type="text" value={form.nome_local_jogo_grupo} onChange={(e) => setForm({ ...form, nome_local_jogo_grupo: e.target.value })} style={inputStyle} />
           </div>
 
-          {/* Wrapper Flexbox Responsivo: Quebra linha se ficar muito apertado no mobile */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "15px", width: "100%" }}>
-            <div style={{ flex: "1 1 200px", textAlign: "left" }}>
+          {/* === AJUSTE AQUI: Removido o flexWrap, forçando proporção 2:1 na mesma linha === */}
+          <div style={{ display: "flex", gap: "15px", width: "100%" }}>
+            <div style={{ flex: "2 1 0", textAlign: "left", minWidth: 0 }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana</label>
               <select value={form.dia_jogo_grupo} onChange={(e) => setForm({ ...form, dia_jogo_grupo: e.target.value })} style={inputStyle}>
                 <option value="Domingo">Domingo</option>
@@ -182,8 +182,8 @@ export default function GroupSettingsPage({ user }) {
               </select>
             </div>
 
-            <div style={{ flex: "1 1 120px", textAlign: "left" }}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Hora do Jogo</label>
+            <div style={{ flex: "1 1 0", textAlign: "left", minWidth: 0 }}>
+              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Hora</label>
               <input type="time" className="time-input-dark-icon" value={form.hora_jogo_grupo} onChange={(e) => setForm({ ...form, hora_jogo_grupo: e.target.value })} style={inputStyle} />
             </div>
           </div>
@@ -198,7 +198,6 @@ export default function GroupSettingsPage({ user }) {
             {uploadingImage && <div style={{ fontSize: "12px", color: "#007bff", marginTop: "8px", fontWeight: "bold" }}>Enviando imagem... ⏳</div>}
           </div>
 
-          {/* Wrapper Flexbox Responsivo para Cores e Times */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "15px", marginTop: "5px", width: "100%" }}>
             
             <div style={{ flex: "1 1 200px", textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
