@@ -47,15 +47,15 @@ export default function GroupSelectionPage({ user, onGroupSelected }) {
         />
       </div>
 
-      {/* Lista com barra de rolagem para não quebrar a tela quando tiver muitos clientes */}
+      {/* Lista com barra de rolagem */}
       <div 
         style={{ 
           display: "flex", 
           flexDirection: "column", 
           gap: "15px", 
-          maxHeight: "50vh", // Ocupa no máximo metade da altura da tela
-          overflowY: "auto", // Cria a barra de rolagem se passar do tamanho
-          paddingRight: "5px" // Dá um espacinho pra barra de rolagem não colar nos botões
+          maxHeight: "60vh", 
+          overflowY: "auto", 
+          paddingRight: "5px" 
         }}
       >
         {filteredGroups.length === 0 ? (
@@ -63,29 +63,83 @@ export default function GroupSelectionPage({ user, onGroupSelected }) {
             Nenhuma pelada encontrada com esse nome.
           </p>
         ) : (
-          filteredGroups.map((group) => (
-            <button
-              key={group.id_grupo}
-              onClick={() => handleSelectGroup(group)}
-              style={{
-                padding: "16px",
-                background: "#fff",
-                border: "2px solid #007bff",
-                borderRadius: "12px",
-                fontSize: "16px",
-                fontWeight: "bold",
-                color: "#007bff",
-                cursor: "pointer",
-                boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
-                transition: "all 0.2s",
-                flexShrink: 0 // Impede que o botão seja esmagado
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = "#007bff"; e.currentTarget.style.color = "#fff"; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = "#007bff"; }}
-            >
-              {group.nome_grupo}
-            </button>
-          ))
+          filteredGroups.map((group) => {
+            // Formata a hora para tirar os segundos (de '22:30:00' para '22:30') se existir
+            const horaFormatada = group.hora_jogo_grupo ? group.hora_jogo_grupo.slice(0, 5) : "--:--";
+            const diaSemana = group.dia_jogo_grupo || "Dia não definido";
+
+            return (
+              <button
+                key={group.id_grupo}
+                onClick={() => handleSelectGroup(group)}
+                className="group-selection-card"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "15px",
+                  padding: "16px",
+                  background: "#fff",
+                  border: "2px solid #007bff",
+                  borderRadius: "12px",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
+                  transition: "all 0.2s ease-in-out",
+                  flexShrink: 0,
+                  textAlign: "left",
+                  position: "relative",
+                  overflow: "hidden"
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#e7f1ff";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 6px 12px rgba(0,123,255,0.15)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#fff";
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 6px rgba(0,0,0,0.05)";
+                }}
+              >
+                {/* Logo do Grupo */}
+                <div style={{ flexShrink: 0 }}>
+                  {group.logo_url ? (
+                    <img 
+                      src={group.logo_url} 
+                      alt="Logo do Grupo" 
+                      style={{ width: "50px", height: "50px", borderRadius: "50%", objectFit: "cover", border: "1px solid #eee", background: "#f8f9fa" }} 
+                    />
+                  ) : (
+                    <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "#f1f3f5", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ddd", fontSize: "20px" }}>
+                      ⚽
+                    </div>
+                  )}
+                </div>
+
+                {/* Informações do Grupo */}
+                <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "16px", fontWeight: "bold", color: "#007bff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {group.nome_grupo}
+                  </span>
+                  
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: "600", color: "#666", background: "#f1f3f5", padding: "3px 8px", borderRadius: "10px" }}>
+                      🗓️ {diaSemana}
+                    </span>
+                    <span style={{ fontSize: "12px", fontWeight: "600", color: "#666", background: "#f1f3f5", padding: "3px 8px", borderRadius: "10px" }}>
+                      ⏰ {horaFormatada}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Ícone de Perfil / Acesso */}
+                {group.perfil === "admin" && (
+                  <div style={{ position: "absolute", top: "10px", right: "10px", fontSize: "10px", background: "#28a745", color: "white", padding: "2px 6px", borderRadius: "8px", fontWeight: "bold" }}>
+                    Admin
+                  </div>
+                )}
+              </button>
+            );
+          })
         )}
       </div>
     </div>
