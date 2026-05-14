@@ -123,13 +123,13 @@ export default function GroupSettingsPage({ user }) {
     fontSize: "15px",
     boxSizing: "border-box",
     backgroundColor: "#ffffff", 
-    color: "#333333",           
+    color: "#333333",          
     outline: "none",
     colorScheme: "light" 
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
+    <div style={{ width: "100%", maxWidth: "600px", margin: "0 auto", padding: "15px", boxSizing: "border-box", paddingBottom: "40px" }}>
       <style>
         {`
           .time-input-dark-icon::-webkit-calendar-picker-indicator {
@@ -146,27 +146,30 @@ export default function GroupSettingsPage({ user }) {
           borderRadius: "12px",
           border: "2px dashed #007bff",
           marginBottom: "20px",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
+          boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+          boxSizing: "border-box",
+          width: "100%"
         }}
       >
-        <h3 style={{ marginTop: 0, color: "#007bff", marginBottom: "20px" }}>
+        <h3 style={{ marginTop: 0, color: "#007bff", marginBottom: "20px", fontSize: "1.2rem" }}>
           ⚙️ Configurações da Pelada
         </h3>
 
-        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "15px", width: "100%" }}>
           
-          <div style={{ textAlign: "left" }}>
+          <div style={{ textAlign: "left", width: "100%" }}>
             <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Nome da Pelada *</label>
             <input type="text" required value={form.nome_grupo} onChange={(e) => setForm({ ...form, nome_grupo: e.target.value })} style={inputStyle} />
           </div>
 
-          <div style={{ textAlign: "left" }}>
+          <div style={{ textAlign: "left", width: "100%" }}>
             <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Local do Jogo</label>
             <input type="text" value={form.nome_local_jogo_grupo} onChange={(e) => setForm({ ...form, nome_local_jogo_grupo: e.target.value })} style={inputStyle} />
           </div>
 
-          <div style={{ display: "flex", gap: "15px" }}>
-            <div style={{ flex: 2, textAlign: "left" }}>
+          {/* Wrapper Flexbox Responsivo: Quebra linha se ficar muito apertado no mobile */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "15px", width: "100%" }}>
+            <div style={{ flex: "1 1 200px", textAlign: "left" }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana</label>
               <select value={form.dia_jogo_grupo} onChange={(e) => setForm({ ...form, dia_jogo_grupo: e.target.value })} style={inputStyle}>
                 <option value="Domingo">Domingo</option>
@@ -179,25 +182,26 @@ export default function GroupSettingsPage({ user }) {
               </select>
             </div>
 
-            <div style={{ flex: 1, textAlign: "left" }}>
+            <div style={{ flex: "1 1 120px", textAlign: "left" }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Hora do Jogo</label>
               <input type="time" className="time-input-dark-icon" value={form.hora_jogo_grupo} onChange={(e) => setForm({ ...form, hora_jogo_grupo: e.target.value })} style={inputStyle} />
             </div>
           </div>
 
-          <div style={{ textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd" }}>
+          <div style={{ textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", width: "100%", boxSizing: "border-box" }}>
             <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "8px" }}>Escudo / Logo da Pelada</label>
-            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px" }}>
-              {form.logo_url && <img src={form.logo_url} alt="Preview" style={{ width: "45px", height: "45px", borderRadius: "50%", objectFit: "cover", border: "2px solid #ccc", background: "#fff" }} />}
-              <input type="text" value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} style={{ ...inputStyle, flex: 1, padding: "8px 12px" }} placeholder="URL ou envie arquivo" />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", marginBottom: "10px" }}>
+              {form.logo_url && <img src={form.logo_url} alt="Preview" style={{ width: "45px", height: "45px", borderRadius: "50%", objectFit: "cover", border: "2px solid #ccc", background: "#fff", flexShrink: 0 }} />}
+              <input type="text" value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} style={{ ...inputStyle, flex: "1 1 200px", padding: "8px 12px" }} placeholder="URL ou envie arquivo" />
             </div>
-            <input type="file" accept="image/*" onChange={handleFileUpload} disabled={uploadingImage} style={{ fontSize: "13px", color: "#333", cursor: "pointer" }} />
-            {uploadingImage && <span style={{ fontSize: "12px", color: "#007bff", marginLeft: "10px", fontWeight: "bold" }}>Enviando imagem... ⏳</span>}
+            <input type="file" accept="image/*" onChange={handleFileUpload} disabled={uploadingImage} style={{ fontSize: "13px", color: "#333", cursor: "pointer", width: "100%", boxSizing: "border-box" }} />
+            {uploadingImage && <div style={{ fontSize: "12px", color: "#007bff", marginTop: "8px", fontWeight: "bold" }}>Enviando imagem... ⏳</div>}
           </div>
 
-          <div style={{ display: "flex", gap: "15px", marginTop: "5px" }}>
+          {/* Wrapper Flexbox Responsivo para Cores e Times */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "15px", marginTop: "5px", width: "100%" }}>
             
-            <div style={{ flex: 1, textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd" }}>
+            <div style={{ flex: "1 1 200px", textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "8px" }}>Time 1 (Interno: A)</label>
               <input 
                 type="text" 
@@ -207,13 +211,13 @@ export default function GroupSettingsPage({ user }) {
                 style={{ ...inputStyle, padding: "8px", marginBottom: "10px", textAlign: "center" }} 
                 placeholder="Máx 8 letras"
               />
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <input type="color" value={form.cor_time_a} onChange={(e) => setForm({ ...form, cor_time_a: e.target.value })} style={{ width: "35px", height: "35px", border: "none", cursor: "pointer", padding: "0", borderRadius: "4px", background: "none" }} />
-                <span style={{ fontSize: "12px", color: "#333" }}>{form.cor_time_a}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <input type="color" value={form.cor_time_a} onChange={(e) => setForm({ ...form, cor_time_a: e.target.value })} style={{ width: "35px", height: "35px", border: "none", cursor: "pointer", padding: "0", borderRadius: "4px", background: "none", flexShrink: 0 }} />
+                <span style={{ fontSize: "12px", color: "#333", wordBreak: "break-all" }}>{form.cor_time_a}</span>
               </div>
             </div>
 
-            <div style={{ flex: 1, textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd" }}>
+            <div style={{ flex: "1 1 200px", textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "8px" }}>Time 2 (Interno: B)</label>
               <input 
                 type="text" 
@@ -223,9 +227,9 @@ export default function GroupSettingsPage({ user }) {
                 style={{ ...inputStyle, padding: "8px", marginBottom: "10px", textAlign: "center" }} 
                 placeholder="Máx 8 letras"
               />
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <input type="color" value={form.cor_time_b} onChange={(e) => setForm({ ...form, cor_time_b: e.target.value })} style={{ width: "35px", height: "35px", border: "none", cursor: "pointer", padding: "0", borderRadius: "4px", background: "none" }} />
-                <span style={{ fontSize: "12px", color: "#333" }}>{form.cor_time_b}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <input type="color" value={form.cor_time_b} onChange={(e) => setForm({ ...form, cor_time_b: e.target.value })} style={{ width: "35px", height: "35px", border: "none", cursor: "pointer", padding: "0", borderRadius: "4px", background: "none", flexShrink: 0 }} />
+                <span style={{ fontSize: "12px", color: "#333", wordBreak: "break-all" }}>{form.cor_time_b}</span>
               </div>
             </div>
 
@@ -237,7 +241,7 @@ export default function GroupSettingsPage({ user }) {
             style={{
               width: "100%", marginTop: "15px", padding: "14px", background: saving ? "#6c757d" : "#28a745",
               color: "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: saving ? "not-allowed" : "pointer",
-              fontSize: "16px", boxShadow: saving ? "none" : "0 4px 10px rgba(40,167,69,0.3)"
+              fontSize: "16px", boxShadow: saving ? "none" : "0 4px 10px rgba(40,167,69,0.3)", boxSizing: "border-box"
             }}
           >
             {saving ? "Salvando..." : "💾 Salvar Configurações"}
