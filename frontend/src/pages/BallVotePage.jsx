@@ -56,7 +56,6 @@ export default function BallVotePage({ user }) {
     if (!matchId) return setPlayers([]);
     setLoadingPlayers(true);
     
-    // === CORREÇÃO CRÍTICA: Removidos position e rating que não estão mais na tabela players global ===
     const { data, error } = await supabase
       .from("match_player")
       .select(`shirt_number, team, status, post_draw_action, player_id, players:player_id!inner (id, name)`)
@@ -65,7 +64,6 @@ export default function BallVotePage({ user }) {
 
     setLoadingPlayers(false);
     if (!error) {
-      // Corrigido "included" para "incluido" que é o status salvo no banco em português
       setPlayers(data.filter(i => !i.post_draw_action || i.post_draw_action === "incluido").map(i => ({
         id: i.players.id,
         name: i.players.name,
@@ -133,11 +131,9 @@ export default function BallVotePage({ user }) {
 
       const now = new Date();
       
-      // === ATUALIZAÇÃO: Horário dinâmico baseado no grupo + 90 minutos ===
-      const horaJogo = activeGroup?.hora_jogo_grupo || "22:30:00"; // Fallback para 22:30 caso esteja vazio
+      const horaJogo = activeGroup?.hora_jogo_grupo; /* || "11:00:00"; */
       const matchStart = new Date(`${match.date}T${horaJogo}-03:00`); 
       
-      // Adiciona 90 minutos (90 * 60 * 1000 milissegundos) ao horário do jogo
       const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000); 
       
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);
@@ -148,7 +144,6 @@ export default function BallVotePage({ user }) {
         setTimeLeft("Aguardando fechamento da partida...");
         setIsVotingOpen(false);
       } else if (now < t1Start) {
-        // Mostra a hora exata formatada em que a votação vai abrir
         const horaAbertura = t1Start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         setTimeLeft(`Aguarde, início da votação às ${horaAbertura}!`);
         setIsVotingOpen(false);
@@ -288,26 +283,29 @@ export default function BallVotePage({ user }) {
 
               const disableClick = !canVote || p.id === user?.player_id;
 
-              // === TAGS DINÂMICAS DE TIME ===
               const teamName = p.team === "A" ? (selectedMatch?.team_a_name || "Time A") : p.team === "B" ? (selectedMatch?.team_b_name || "Time B") : "";
               const teamColor = p.team === "A" ? (selectedMatch?.team_a_color || "#333") : p.team === "B" ? (selectedMatch?.team_b_color || "#333") : "transparent";
 
               return (
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px", background: "#f8f9fa", borderRadius: "8px", opacity: disableClick ? 0.6 : 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0 }}>
+                  
+                  {/* === AJUSTE DE LAYOUT AQUI: Coluna para o Texto, liberando espaço === */}
+                  <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, paddingRight: "8px" }}>
                     
-                    {/* Badge do Time */}
+                    {/* Badge do Time agora fica EM CIMA do nome */}
                     {p.team && selectedMatch?.is_drawn && (
                       <span style={{ 
-                        background: teamColor, 
-                        color: "#fff", 
+                        color: teamColor, 
                         fontSize: "10px", 
-                        padding: "3px 6px", 
-                        borderRadius: "4px",
-                        fontWeight: "bold",
+                        fontWeight: "900",
                         textTransform: "uppercase",
-                        whiteSpace: "nowrap"
+                        marginBottom: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px"
                       }}>
+                        {/* Bolinha com a cor do time para dar estilo */}
+                        <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: teamColor }}></span>
                         {teamName}
                       </span>
                     )}
@@ -317,26 +315,28 @@ export default function BallVotePage({ user }) {
                     </span>
                   </div>
 
-                  <div style={{ display: "flex", gap: "6px" }}>
+                  {/* Área dos Botões com flexShrink: 0 para eles não serem amassados na tela pequena */}
+                  <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                     {canCheia && (
                       <button 
                         onClick={() => setBolaCheiaId(p.id)} 
                         disabled={disableClick}
-                        style={{ padding: "8px 12px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaCheiaId === p.id ? "#28a745" : "#e9ecef", color: bolaCheiaId === p.id ? "#fff" : "#333" }}
+                        style={{ padding: "8px 10px", fontSize: "13px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaCheiaId === p.id ? "#28a745" : "#e9ecef", color: bolaCheiaId === p.id ? "#fff" : "#333" }}
                       >
-                        ⚽Cheia
+                        ⚽ Cheia
                       </button>
                     )}
                     {canMurcha && (
                       <button 
                         onClick={() => setBolaMurchaId(p.id)} 
                         disabled={disableClick}
-                        style={{ padding: "8px 12px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaMurchaId === p.id ? "#dc3545" : "#e9ecef", color: bolaMurchaId === p.id ? "#fff" : "#333" }}
+                        style={{ padding: "8px 10px", fontSize: "13px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaMurchaId === p.id ? "#dc3545" : "#e9ecef", color: bolaMurchaId === p.id ? "#fff" : "#333" }}
                       >
-                        🎈Murcha
+                        🎈 Murcha
                       </button>
                     )}
                   </div>
+
                 </div>
               );
             })}
