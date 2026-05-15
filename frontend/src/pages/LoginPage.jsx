@@ -355,7 +355,7 @@ export default function LoginPage({ onLoginSuccess }) {
               <div style={{ textAlign: "left" }}>
                 <label style={{ fontSize: "14px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Observações (Opcional)</label>
                 <textarea
-                  placeholder="Ex: Quadra coberta, society, precisamos de goleiro..."
+                  placeholder="Ex: Quero conhecer seu app e implantar na minha pelada."
                   value={reqObs}
                   onChange={(e) => setReqObs(e.target.value)}
                   rows="3"
