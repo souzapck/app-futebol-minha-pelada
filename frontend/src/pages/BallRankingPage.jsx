@@ -77,11 +77,15 @@ export default function BallRankingPage() {
     const now = new Date();
     const partidasFinalizadasIds = new Set();
 
+    // === MUDANÇA: Busca a hora do jogo do grupo dinamicamente ===
+    const horaJogo = activeGroup?.hora_jogo_grupo ? activeGroup.hora_jogo_grupo.slice(0, 5) + ':00' : "22:30:00";
+
     // 4. Identifica quais partidas já terminaram a votação
     (matchesData || []).forEach((match) => {
 
-      // === AMBIENTE DE PRODUÇÃO ===
-      const t1Start = new Date(`${match.date}T22:30:00-03:00`);
+      // Calcula o início do jogo e soma 90 min para o início do 1º turno de votação
+      const matchStart = new Date(`${match.date}T${horaJogo}-03:00`);
+      const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000);
 
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);
       const t2Start = new Date(t1End.getTime() + INTERVALO);
