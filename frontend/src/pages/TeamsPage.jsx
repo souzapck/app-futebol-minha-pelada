@@ -50,8 +50,12 @@ export default function TeamsPage({ user }) {
 
   const [teamA, setTeamA] = useState([]);
   const [teamB, setTeamB] = useState([]);
+  const [teamC, setTeamC] = useState([]); 
+  
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
+  const [scoreC, setScoreC] = useState(0); 
+  
   const [goals, setGoals] = useState({});
   const [ownGoals, setOwnGoals] = useState({});
   const [shirtMap, setShirtMap] = useState({});
@@ -68,26 +72,34 @@ export default function TeamsPage({ user }) {
 
   const { activeGroup, isAdmin } = useGroup();
 
-  const [groupCorA, setGroupCorA] = useState("#0b0b0b");
-  const [groupCorB, setGroupCorB] = useState("#c00707");
-  const [groupNomeA, setGroupNomeA] = useState("Time A");
-  const [groupNomeB, setGroupNomeB] = useState("Time B");
-  const [diaJogo, setDiaJogo] = useState("QUINTA-FEIRA");
+  const [config, setConfig] = useState({
+    cor_a: "#0b0b0b", cor_b: "#c00707", cor_c: "#28a745",
+    nome_a: "Time A", nome_b: "Time B", nome_c: "Time C",
+    qtd_times: 2, dia_jogo: "QUINTA-FEIRA"
+  });
 
-  const displayCorA = (selectedMatch?.is_drawn && selectedMatch?.team_a_color) ? selectedMatch.team_a_color : groupCorA;
-  const displayCorB = (selectedMatch?.is_drawn && selectedMatch?.team_b_color) ? selectedMatch.team_b_color : groupCorB;
-  const displayNomeA = (selectedMatch?.is_drawn && selectedMatch?.team_a_name) ? selectedMatch.team_a_name : groupNomeA;
-  const displayNomeB = (selectedMatch?.is_drawn && selectedMatch?.team_b_name) ? selectedMatch.team_b_name : groupNomeB;
+  // === LÓGICA DE DETECÇÃO DE HISTÓRICO ===
+  // Se o jogo está fechado, usamos os dados do jogo. Se está aberto, usamos a config do grupo.
+  const displayCorA = (selectedMatch?.is_drawn && selectedMatch?.team_a_color) ? selectedMatch.team_a_color : config.cor_a;
+  const displayCorB = (selectedMatch?.is_drawn && selectedMatch?.team_b_color) ? selectedMatch.team_b_color : config.cor_b;
+  const displayCorC = (selectedMatch?.is_drawn && selectedMatch?.team_c_color) ? selectedMatch.team_c_color : config.cor_c;
+  
+  const displayNomeA = (selectedMatch?.is_drawn && selectedMatch?.team_a_name) ? selectedMatch.team_a_name : config.nome_a;
+  const displayNomeB = (selectedMatch?.is_drawn && selectedMatch?.team_b_name) ? selectedMatch.team_b_name : config.nome_b;
+  const displayNomeC = (selectedMatch?.is_drawn && selectedMatch?.team_c_name) ? selectedMatch.team_c_name : config.nome_c;
+
+  // A variável mais importante da página: Ela decide dinamicamente se a visualização atual terá 2 ou 3 times.
+  const displayQtdTimes = selectedMatch?.is_drawn 
+    ? (selectedMatch.team_c_name ? 3 : 2) // Se for partida antiga, olha se o Time C foi salvo no banco.
+    : config.qtd_times;                   // Se for escalação nova (jogo aberto), olha a config atual do grupo.
 
   useEffect(() => {
     if (activeGroup) {
       loadGroupConfig();
       loadMatches();
       setSelectedMatch(null);
-      setTeamA([]);
-      setTeamB([]);
-      setScoreA(0);
-      setScoreB(0);
+      setTeamA([]); setTeamB([]); setTeamC([]);
+      setScoreA(0); setScoreB(0); setScoreC(0);
       setConfirmedList([]);
     }
   }, [activeGroup]);
@@ -102,16 +114,21 @@ export default function TeamsPage({ user }) {
     try {
       const { data } = await supabase
         .from("grupos_pelada")
-        .select("cor_time_a, cor_time_b, nome_time_a, nome_time_b, dia_jogo_grupo")
+        .select("cor_time_a, cor_time_b, cor_time_c, nome_time_a, nome_time_b, nome_time_c, dia_jogo_grupo, qtd_times")
         .eq("id_grupo", activeGroup.id_grupo)
         .single();
 
       if (data) {
-        setGroupCorA(data.cor_time_a || "#0b0b0b");
-        setGroupCorB(data.cor_time_b || "#c00707");
-        setGroupNomeA(data.nome_time_a || "Time A");
-        setGroupNomeB(data.nome_time_b || "Time B");
-        setDiaJogo(data.dia_jogo_grupo || "QUINTA-FEIRA");
+        setConfig({
+          cor_a: data.cor_time_a || "#0b0b0b",
+          cor_b: data.cor_time_b || "#c00707",
+          cor_c: data.cor_time_c || "#28a745",
+          nome_a: data.nome_time_a || "Time A",
+          nome_b: data.nome_time_b || "Time B",
+          nome_c: data.nome_time_c || "Time C",
+          qtd_times: data.qtd_times || 2,
+          dia_jogo: data.dia_jogo_grupo || "QUINTA-FEIRA"
+        });
       }
     } catch (err) {
       console.error("Erro ao carregar configurações do grupo", err);
@@ -130,13 +147,14 @@ export default function TeamsPage({ user }) {
   });
 
   const handleShirtChange = (playerId, value) => {
-    const player = players.find((p) => p.id === playerId) || teamA.find((p) => p.id === playerId) || teamB.find((p) => p.id === playerId);
+    const player = players.find((p) => p.id === playerId) || [...teamA, ...teamB, ...teamC].find((p) => p.id === playerId);
     if (player?.fixed_shirt_number) return;
     const numberValue = value === "" ? "" : Math.max(0, Math.min(99, parseInt(value) || 0));
 
     setShirtMap((prev) => ({ ...prev, [playerId]: numberValue }));
     setTeamA((prev) => prev.map((p) => p.id === playerId ? { ...p, shirt_number: numberValue === "" ? null : numberValue } : p));
     setTeamB((prev) => prev.map((p) => p.id === playerId ? { ...p, shirt_number: numberValue === "" ? null : numberValue } : p));
+    setTeamC((prev) => prev.map((p) => p.id === playerId ? { ...p, shirt_number: numberValue === "" ? null : numberValue } : p));
   };
 
   const loadMatches = async () => {
@@ -148,7 +166,6 @@ export default function TeamsPage({ user }) {
     setSelectedMatch(match);
     const { data: matchPlayersData } = await supabase.from("match_player").select("*").eq("match_id", match.id).order("id", { ascending: true });
     
-    // === MUDANÇA AQUI: Busca da grupo_membros em vez da tabela players ===
     const { data: membrosData } = await supabase
       .from("grupo_membros")
       .select(`
@@ -158,15 +175,9 @@ export default function TeamsPage({ user }) {
       .eq("id_grupo", activeGroup.id_grupo)
       .eq("is_hidden", false);
 
-    // Achata a lista para o formato que a página já espera
     const playersData = (membrosData || []).map((m) => ({
-      id: m.players.id,
-      name: m.players.name,
-      phone: m.players.phone,
-      position: m.position,
-      rating: m.rating,
-      shirt_number: m.shirt_number,
-      is_spectator: m.is_spectator
+      id: m.players.id, name: m.players.name, phone: m.players.phone,
+      position: m.position, rating: m.rating, shirt_number: m.shirt_number, is_spectator: m.is_spectator
     }));
 
     setAllPlayers(playersData || []);
@@ -180,7 +191,7 @@ export default function TeamsPage({ user }) {
     setPlayers(confirmedOriginals);
     setConfirmedList(confirmedOriginals.map((p, index) => ({ ordem: index + 1, position: p.position, name: p.name })));
 
-    const playersInTeams = (matchPlayersData || []).filter((item) => item.team === "A" || item.team === "B").map((item) => {
+    const playersInTeams = (matchPlayersData || []).filter((item) => ["A", "B", "C"].includes(item.team)).map((item) => {
       const player = (playersData || []).find((p) => Number(p.id) === Number(item.player_id));
       if (!player) return null;
       return buildPlayerView(player, item);
@@ -194,25 +205,97 @@ export default function TeamsPage({ user }) {
     if (match.is_drawn) {
       setTeamA(playersInTeams.filter((p) => p.team === "A"));
       setTeamB(playersInTeams.filter((p) => p.team === "B"));
-      setScoreA(match.score_a || 0); setScoreB(match.score_b || 0);
+      setTeamC(playersInTeams.filter((p) => p.team === "C"));
+      
+      setScoreA(match.score_a || 0); 
+      setScoreB(match.score_b || 0);
+      setScoreC(match.score_c || 0);
+      
       const goalsMap = {}; const ownGoalsMap = {};
       playersInTeams.forEach((p) => { goalsMap[p.id] = p.goals || 0; ownGoalsMap[p.id] = p.own_goals || 0; });
       setGoals(goalsMap); setOwnGoals(ownGoalsMap);
     } else {
-      setTeamA([]); setTeamB([]); setScoreA(0); setScoreB(0); setGoals({}); setOwnGoals({});
+      setTeamA([]); setTeamB([]); setTeamC([]); 
+      setScoreA(0); setScoreB(0); setScoreC(0);
+      setGoals({}); setOwnGoals({});
     }
 
     setActionMenuPlayerId(null); setReplacementModalOpen(false); setPlayerToReplace(null); setReplacementOptions([]); setSelectedReplacementId(""); setModalMode(null); setTargetTeam(null);
   };
 
   const sortearTimes = () => {
-    if (players.length < 2) { alert("Não há jogadores suficientes para sortear os times!"); return; }
+    if (players.length < config.qtd_times) { 
+        alert(`Não há jogadores suficientes para preencher os ${config.qtd_times} times!`); 
+        return; 
+    }
+    
     const embaralhar = (lista) => [...lista].sort(() => Math.random() - 0.5);
-    const porPosicao = { GOL: [], ZAG: [], LAT: [], MEI: [], ATA: [] };
-    players.forEach((p) => { const pos = porPosicao[p.position] ? p.position : "MEI"; porPosicao[pos].push(p); });
-    Object.keys(porPosicao).forEach((pos) => { porPosicao[pos] = embaralhar(porPosicao[pos]).sort((a, b) => b.rating - a.rating); });
+    
+    let tA = []; let tB = []; let tC = [];
+    let forcaA = 0; let forcaB = 0; let forcaC = 0;
 
-    let tA = []; let tB = []; let forcaA = 0; let forcaB = 0;
+    const agruparPorPosicao = () => {
+      const porPosicao = { GOL: [], ZAG: [], LAT: [], MEI: [], ATA: [] };
+      players.forEach((p) => { 
+        const pos = porPosicao[p.position] ? p.position : "MEI"; 
+        porPosicao[pos].push(p); 
+      });
+      Object.keys(porPosicao).forEach((pos) => { 
+        porPosicao[pos] = embaralhar(porPosicao[pos]).sort((a, b) => b.rating - a.rating); 
+      });
+      return porPosicao;
+    };
+
+    // --- LÓGICA PARA 3 TIMES ---
+    if (config.qtd_times === 3) {
+      const porPosicao = agruparPorPosicao();
+
+      const addToTeam3 = (player, team) => {
+        if (team === "A") { tA.push(player); forcaA += Number(player.rating) || 0; } 
+        else if (team === "B") { tB.push(player); forcaB += Number(player.rating) || 0; }
+        else { tC.push(player); forcaC += Number(player.rating) || 0; }
+      };
+
+      const weakerTeam3 = () => {
+        const minSize = Math.min(tA.length, tB.length, tC.length);
+        const timesDisponiveis = [];
+        if (tA.length === minSize) timesDisponiveis.push({ nome: "A", forca: forcaA });
+        if (tB.length === minSize) timesDisponiveis.push({ nome: "B", forca: forcaB });
+        if (tC.length === minSize) timesDisponiveis.push({ nome: "C", forca: forcaC });
+
+        timesDisponiveis.sort((a, b) => a.forca - b.forca);
+        return timesDisponiveis[0].nome;
+      };
+
+      const distribuirBasePorPosicao3 = (pos) => {
+        const lista = [...porPosicao[pos]];
+        while (lista.length > 0) {
+           addToTeam3(lista.shift(), weakerTeam3());
+        }
+      };
+
+      ["ZAG", "LAT", "MEI", "ATA"].forEach(distribuirBasePorPosicao3);
+
+      if (porPosicao.GOL.length > 0) {
+        const goleiros = [...porPosicao.GOL];
+        const weakestOverallTeam3 = () => {
+          const times = [ { nome: "A", forca: forcaA }, { nome: "B", forca: forcaB }, { nome: "C", forca: forcaC } ];
+          times.sort((a, b) => a.forca - b.forca);
+          return times[0].nome;
+        };
+
+        while (goleiros.length > 0) {
+          addToTeam3(goleiros.shift(), weakestOverallTeam3());
+        }
+      }
+
+      setTeamA(tA); setTeamB(tB); setTeamC(tC);
+      return;
+    }
+
+    // --- LÓGICA PARA 2 TIMES ---
+    const porPosicao = agruparPorPosicao();
+
     const addToTeam = (player, team) => {
       if (team === "A") { tA.push(player); forcaA += Number(player.rating) || 0; } 
       else { tB.push(player); forcaB += Number(player.rating) || 0; }
@@ -239,7 +322,7 @@ export default function TeamsPage({ user }) {
     ["ZAG", "LAT", "MEI", "ATA"].forEach((pos) => { porPosicao[pos].forEach((player) => { addToTeam(player, weakerTeam()); }); porPosicao[pos] = []; });
 
     if (porPosicao.GOL.length > 0) {
-      const goleiros = [...porPosicao.GOL].sort((a, b) => b.rating - a.rating);
+      const goleiros = [...porPosicao.GOL]; 
       if (goleiros.length >= 2) {
         const g1 = goleiros.shift(); const g2 = goleiros.shift();
         const timeG1 = weakerTeam(); const timeG2 = timeG1 === "A" ? "B" : "A";
@@ -275,13 +358,35 @@ export default function TeamsPage({ user }) {
     try {
       const updatesA = teamA.map((p) => supabase.from("match_player").update({ team: "A", shirt_number: shirtMap[p.id] === "" ? null : Number(shirtMap[p.id]) }).eq("match_id", selectedMatch.id).eq("player_id", p.id));
       const updatesB = teamB.map((p) => supabase.from("match_player").update({ team: "B", shirt_number: shirtMap[p.id] === "" ? null : Number(shirtMap[p.id]) }).eq("match_id", selectedMatch.id).eq("player_id", p.id));
-      await Promise.all([...updatesA, ...updatesB]);
+      
+      let updatesC = [];
+      if (config.qtd_times === 3) {
+        updatesC = teamC.map((p) => supabase.from("match_player").update({ team: "C", shirt_number: shirtMap[p.id] === "" ? null : Number(shirtMap[p.id]) }).eq("match_id", selectedMatch.id).eq("player_id", p.id));
+      }
+      
+      await Promise.all([...updatesA, ...updatesB, ...updatesC]);
 
-      await supabase.from("matches").update({ is_drawn: true, team_a_name: groupNomeA, team_a_color: groupCorA, team_b_name: groupNomeB, team_b_color: groupCorB }).eq("id", selectedMatch.id);
+      // Salva NULO se a partida for de 2 times. Isso garante a leitura perfeita no histórico futuro!
+      await supabase.from("matches").update({ 
+          is_drawn: true, 
+          team_a_name: config.nome_a, team_a_color: config.cor_a, 
+          team_b_name: config.nome_b, team_b_color: config.cor_b,
+          team_c_name: config.qtd_times === 3 ? config.nome_c : null, 
+          team_c_color: config.qtd_times === 3 ? config.cor_c : null 
+      }).eq("id", selectedMatch.id);
       
       alert("✅ Sorteio confirmado e jogo travado!");
       await loadMatches();
-      await loadMatchData({ ...selectedMatch, is_drawn: true, team_a_name: groupNomeA, team_a_color: groupCorA, team_b_name: groupNomeB, team_b_color: groupCorB });
+      
+      // Recarrega o estado emulando o que acabou de ser gravado no banco
+      await loadMatchData({ 
+        ...selectedMatch, 
+        is_drawn: true, 
+        team_a_name: config.nome_a, team_a_color: config.cor_a, 
+        team_b_name: config.nome_b, team_b_color: config.cor_b, 
+        team_c_name: config.qtd_times === 3 ? config.nome_c : null, 
+        team_c_color: config.qtd_times === 3 ? config.cor_c : null 
+      });
     } catch (error) { console.error(error); alert("❌ Erro ao confirmar o sorteio."); }
   };
 
@@ -370,11 +475,11 @@ export default function TeamsPage({ user }) {
     if (!window.confirm("⚠️ Deseja REABRIR esta partida?")) return;
     try {
       await supabase.from("match_player").update({ team: null, goals: 0, own_goals: 0, post_draw_action: null, replaced_by_player_id: null, replaced_player_id: null }).eq("match_id", selectedMatch.id);
-      await supabase.from("matches").update({ is_drawn: false, score_a: 0, score_b: 0, team_a_name: null, team_a_color: null, team_b_name: null, team_b_color: null }).eq("id", selectedMatch.id);
+      await supabase.from("matches").update({ is_drawn: false, score_a: 0, score_b: 0, score_c: 0, team_a_name: null, team_a_color: null, team_b_name: null, team_b_color: null, team_c_name: null, team_c_color: null }).eq("id", selectedMatch.id);
       
       alert("✅ Jogo reaberto!");
       await loadMatches();
-      await loadMatchData({ ...selectedMatch, is_drawn: false, score_a: 0, score_b: 0, team_a_name: null, team_a_color: null, team_b_name: null, team_b_color: null });
+      await loadMatchData({ ...selectedMatch, is_drawn: false, score_a: 0, score_b: 0, score_c: 0, team_a_name: null, team_a_color: null, team_b_name: null, team_b_color: null, team_c_name: null, team_c_color: null });
     } catch (error) { console.error(error); alert("❌ Erro."); }
   };
 
@@ -383,13 +488,18 @@ export default function TeamsPage({ user }) {
 
   const salvarEstatisticas = async () => {
     try {
-      await supabase.from("matches").update({ score_a: Number(scoreA), score_b: Number(scoreB) }).eq("id", selectedMatch.id);
+      await supabase.from("matches").update({ 
+        score_a: Number(scoreA), 
+        score_b: Number(scoreB), 
+        score_c: displayQtdTimes === 3 ? Number(scoreC) : 0 
+      }).eq("id", selectedMatch.id);
+      
       const playerIds = Array.from(new Set([...Object.keys(goals), ...Object.keys(ownGoals)]));
       const goalUpdates = playerIds.map((playerId) => supabase.from("match_player").update({ goals: Number(goals[playerId]) || 0, own_goals: Number(ownGoals[playerId]) || 0 }).eq("match_id", selectedMatch.id).eq("player_id", Number(playerId)));
       await Promise.all(goalUpdates);
 
       alert("✅ Estatísticas do jogo salvas!");
-      await loadMatchData({ ...selectedMatch, score_a: Number(scoreA), score_b: Number(scoreB) });
+      await loadMatchData({ ...selectedMatch, score_a: Number(scoreA), score_b: Number(scoreB), score_c: displayQtdTimes === 3 ? Number(scoreC) : 0 });
     } catch (error) { console.error(error); alert("❌ Erro."); }
   };
 
@@ -398,19 +508,23 @@ export default function TeamsPage({ user }) {
   const ordenarPorPosicao = (time) => { const pesos = { GOL: 1, ZAG: 2, LAT: 3, MEI: 4, ATA: 5 }; return [...time].sort((a, b) => (pesos[a.position] || 99) - (pesos[b.position] || 99)); };
 
   const copiarWhatsApp = () => {
-    const nomeDia = diaJogo ? diaJogo.toUpperCase() : "PELADA";
     const nomePelada = activeGroup?.nome_grupo ? activeGroup.nome_grupo.toUpperCase() : "PELADA";
     
     let texto = `⚽ *${nomePelada}* (${selectedMatch.date.split("-").reverse().join("/")})\n\n`;
 
-    const timeAOrdenado = ordenarPorPosicao(teamA);
-    const timeBOrdenado = ordenarPorPosicao(teamB);
+    const timesToRender = [
+        { nome: displayNomeA, cor: displayCorA, time: teamA },
+        { nome: displayNomeB, cor: displayCorB, time: teamB }
+    ];
+    if (displayQtdTimes === 3) {
+        timesToRender.push({ nome: displayNomeC, cor: displayCorC, time: teamC });
+    }
 
-    const emojiA = getEmojiForColor(displayCorA);
-    const emojiB = getEmojiForColor(displayCorB);
-
-    texto += `${emojiA} *${displayNomeA.toUpperCase()}* (⭐ ${calcForca(teamA)})\n${timeAOrdenado.map((p) => `• ${formatarJogador(p)}`).join("\n")}\n\n`;
-    texto += `${emojiB} *${displayNomeB.toUpperCase()}* (⭐ ${calcForca(teamB)})\n${timeBOrdenado.map((p) => `• ${formatarJogador(p)}`).join("\n")}\n\n`;
+    timesToRender.forEach(t => {
+        const timeOrdenado = ordenarPorPosicao(t.time);
+        const emoji = getEmojiForColor(t.cor);
+        texto += `${emoji} *${t.nome.toUpperCase()}* (⭐ ${calcForca(t.time)})\n${timeOrdenado.map((p) => `• ${formatarJogador(p)}`).join("\n")}\n\n`;
+    });
 
     navigator.clipboard.writeText(texto);
     alert("Copiado para área de transferência, pode colar no WhatsApp!");
@@ -432,7 +546,7 @@ export default function TeamsPage({ user }) {
   };
 
   const renderTeamCard = (title, borderColor, team, score, setScore, teamKey) => (
-    <div style={{ width: "100%", background: "#fff", padding: "15px", borderRadius: "10px", border: `3px solid ${borderColor}`, boxShadow: "0 4px 6px rgba(0,0,0,0.06)" }}>
+    <div style={{ width: "100%", background: "#fff", padding: "15px", borderRadius: "10px", border: `3px solid ${borderColor}`, boxShadow: "0 4px 6px rgba(0,0,0,0.06)", boxSizing: "border-box" }}>
       <h3 style={{ textAlign: "center", color: "#000102", marginTop: 0, marginBottom: "15px", fontWeight: "bold", fontSize: "16px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
         {title} <span style={{ fontSize: "10px", color: "#666", fontWeight: "normal" }}>(⭐ {calcForca(team)})</span>
       </h3>
@@ -445,7 +559,7 @@ export default function TeamsPage({ user }) {
 
       {selectedMatch.is_drawn && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "12px", background: "#e9ecef", padding: "6px", borderRadius: "8px" }}>
-          <label style={{ fontWeight: "bold", marginRight: "10px", color: "#333", fontSize: "14px" }}>Placar:</label>
+          <label style={{ fontWeight: "bold", marginRight: "10px", color: "#333", fontSize: "14px" }}>Placar (Vitórias):</label>
           <input type="number" value={score} onChange={(e) => setScore(e.target.value)} style={{ width: "50px", textAlign: "center", fontSize: "18px", fontWeight: "bold", padding: "4px", borderRadius: "6px", border: "1px solid #ccc", color: "#000", backgroundColor: "#fff" }} />
         </div>
       )}
@@ -454,8 +568,8 @@ export default function TeamsPage({ user }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", fontSize: "11px", fontWeight: "bold", color: "#666" }}>
           <span>Jogador</span>
           <div style={{ display: "flex", gap: "6px" }}>
-            <span style={{ width: "30px", textAlign: "center" }}>⚽</span>
-            <span style={{ width: "30px", textAlign: "center" }}>🥅</span>
+            <span style={{ width: "30px", textAlign: "center", fontSize: "14px" }} title="Gols Marcados">⚽</span>
+            <span style={{ width: "30px", textAlign: "center", fontSize: "14px" }} title="Gols Contra">🥅</span>
             {isAdmin && <span style={{ width: "24px", textAlign: "center" }}></span>}
           </div>
         </div>
@@ -488,25 +602,27 @@ export default function TeamsPage({ user }) {
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
-      <div style={{ gap: "10px", overflowX: "auto", marginBottom: "20px", paddingBottom: "10px" }}>
+      
+      <div style={{ overflowX: "auto", gap: "10px", marginBottom: "20px", paddingBottom: "10px" }}>
         {matches.map((m) => (
-          <button key={m.id} onClick={() => loadMatchData(m)} style={{ marginBottom: "5px", marginInline: "3px", padding: "12px", borderRadius: "15px", cursor: "pointer", border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd", background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff", color: "#333", fontWeight: selectedMatch?.id === m.id ? "bold" : "normal" }}>
+          <button key={m.id} onClick={() => loadMatchData(m)} style={{ marginBottom: "5px", marginInline: "3px", padding: "12px", borderRadius: "15px", cursor: "pointer", border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd", background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff", color: "#333", fontWeight: selectedMatch?.id === m.id ? "bold" : "normal", whiteSpace: "nowrap" }}>
             {m.date.split("-").reverse().join("/")} {m.is_drawn && "🔒"}
           </button>
         ))}
       </div>
 
       {selectedMatch && (
-        <div style={{ minWidth: "300px", maxWidth: "570px", background: "#f8f9fa", padding: "20px", borderRadius: "12px", border: "1px solid #dddddd" }}>
+        <div style={{ width: "100%", background: "#f8f9fa", padding: "20px", borderRadius: "12px", border: "1px solid #dddddd", boxSizing: "border-box" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-            <h2 style={{ margin: 0, color: "#333" }}>{selectedMatch.is_drawn ? "🔒 Jogo Fechado" : "🎲 Escalação não realizada"}</h2>
-            {teamA.length > 0 && <button onClick={copiarWhatsApp} style={{ background: "#25D366", color: "white", padding: "10px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", boxShadow: "0 2px 5px rgba(37,211,102,0.3)" }}>📱 WhatsApp</button>}
+            <h2 style={{ margin: 0, color: "#333", fontSize: "18px" }}>{selectedMatch.is_drawn ? "🔒 Jogo Fechado" : "🎲 Escalação não realizada"}</h2>
+            {teamA.length > 0 && <button onClick={copiarWhatsApp} style={{ background: "#25D366", color: "white", padding: "10px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", boxShadow: "0 2px 5px rgba(37,211,102,0.3)", fontSize: "13px" }}>📱 WhatsApp</button>}
           </div>
 
           {(teamA.length > 0 || teamB.length > 0) && (
-            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", justifyContent: "center", marginBottom: "25px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "25px", width: "100%" }}>
               {renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorA }}></span> {displayNomeA}</>, displayCorA, teamA, scoreA, setScoreA, "A")}
               {renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorB }}></span> {displayNomeB}</>, displayCorB, teamB, scoreB, setScoreB, "B")}
+              {displayQtdTimes === 3 && renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorC }}></span> {displayNomeC}</>, displayCorC, teamC, scoreC, setScoreC, "C")}
             </div>
           )}
 
@@ -525,7 +641,8 @@ export default function TeamsPage({ user }) {
               ) : (
                 <div style={{ display: "flex", gap: "12px", flexDirection: "column", background: "#fff", padding: "15px", borderRadius: "10px", border: "1px solid #dee2e6" }}>
                   <button onClick={salvarEstatisticas} style={{ width: "100%", padding: "16px", background: "#ffc107", color: "#333", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: "bold", boxShadow: "0 4px 6px rgba(255,193,7,0.2)" }}>💾 Salvar Estatísticas</button>
-                  {(Number(scoreA) === 0 && Number(scoreB) === 0 && Object.values(goals).every((g) => Number(g) === 0) && Object.values(ownGoals).every((g) => Number(g) === 0)) && (
+                  {/* Se todos os placares e gols estiverem zerados, permite reabrir o jogo */}
+                  {(Number(scoreA) === 0 && Number(scoreB) === 0 && (displayQtdTimes === 2 || Number(scoreC) === 0) && Object.values(goals).every((g) => Number(g) === 0) && Object.values(ownGoals).every((g) => Number(g) === 0)) && (
                     <button onClick={desfazerSorteio} style={{ width: "100%", padding: "14px", background: "#fff", color: "#dc3545", borderRadius: "8px", border: "2px solid #dc3545", cursor: "pointer", fontSize: "16px", fontWeight: "bold", marginTop: "10px" }}>⚠️ Reabrir Jogo (Desfazer Sorteio)</button>
                   )}
                 </div>
@@ -549,7 +666,7 @@ export default function TeamsPage({ user }) {
           <div style={{ width: "100%", maxWidth: "420px", background: "#fff", borderRadius: "12px", padding: "20px", boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}>
             <h3 style={{ marginTop: 0, color: "#333" }}>{modalMode === "replace" ? "🔁 Substituir jogador" : "➕ Incluir jogador"}</h3>
             {modalMode === "replace" && <div style={{ fontSize: "14px", color: "#555", marginBottom: "12px" }}>Jogador atual: <strong>{playerToReplace?.name}</strong></div>}
-            {modalMode === "include" && <div style={{ fontSize: "14px", color: "#555", marginBottom: "12px" }}>Time destino: <strong>{targetTeam === "A" ? displayNomeA : displayNomeB}</strong></div>}
+            {modalMode === "include" && <div style={{ fontSize: "14px", color: "#555", marginBottom: "12px" }}>Time destino: <strong>{targetTeam === "A" ? displayNomeA : targetTeam === "B" ? displayNomeB : displayNomeC}</strong></div>}
             {replacementOptions.length === 0 ? (
               <div style={{ background: "#f8f9fa", border: "1px solid #dee2e6", borderRadius: "8px", padding: "12px", color: "#666", marginBottom: "16px" }}>Nenhum jogador elegível disponível.</div>
             ) : (

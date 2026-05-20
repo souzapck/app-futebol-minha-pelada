@@ -264,9 +264,9 @@ export default function BallVotePage({ user }) {
 
     const selectedMatch = matches.find(m => String(m.id) === String(selectedMatchId));
 
-    // === NOVA ORDENAÇÃO: Time A -> Time B -> Ordem Alfabética ===
+    // Ordenação: Time A -> Time B -> Time C -> Sem Time (Ordem Alfabética em cada grupo)
     const sortedPlayers = [...players].sort((a, b) => {
-      const teamA = a.team || "Z"; // Se não tiver time, joga pro fim da fila
+      const teamA = a.team || "Z"; 
       const teamB = b.team || "Z";
 
       if (teamA !== teamB) {
@@ -304,14 +304,20 @@ export default function BallVotePage({ user }) {
 
               const disableClick = !canVote || p.id === user?.player_id;
 
-              const teamName = p.team === "A" ? (selectedMatch?.team_a_name || "Time A") : p.team === "B" ? (selectedMatch?.team_b_name || "Time B") : "";
-              const teamColor = p.team === "A" ? (selectedMatch?.team_a_color || "#333") : p.team === "B" ? (selectedMatch?.team_b_color || "#333") : "transparent";
+              // Identifica os dados de cor e nome de TODOS os times (A, B e C)
+              const teamName = p.team === "A" ? (selectedMatch?.team_a_name || "Time A") : 
+                               p.team === "B" ? (selectedMatch?.team_b_name || "Time B") : 
+                               p.team === "C" ? (selectedMatch?.team_c_name || "Time C") : "";
+                               
+              const teamColor = p.team === "A" ? (selectedMatch?.team_a_color || "#333") : 
+                                p.team === "B" ? (selectedMatch?.team_b_color || "#333") : 
+                                p.team === "C" ? (selectedMatch?.team_c_color || "#333") : "transparent";
 
-              // Identifica se estamos desenhando o primeiro jogador do Time B para colocar uma linha divisória invisível (margem extra)
-              const isFirstOfTeamB = p.team === "B" && index > 0 && sortedPlayers[index - 1].team === "A";
+              // Identifica se estamos desenhando o primeiro jogador de um novo time para colocar margem
+              const isFirstOfNewTeam = index > 0 && p.team && sortedPlayers[index - 1].team !== p.team;
 
               return (
-                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px", background: "#f8f9fa", borderRadius: "8px", opacity: disableClick ? 0.6 : 1, marginTop: isFirstOfTeamB ? "8px" : "0" }}>
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px", background: "#f8f9fa", borderRadius: "8px", opacity: disableClick ? 0.6 : 1, marginTop: isFirstOfNewTeam ? "8px" : "0" }}>
                   
                   <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, paddingRight: "8px" }}>
                     {p.team && selectedMatch?.is_drawn && (

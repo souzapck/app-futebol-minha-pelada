@@ -17,7 +17,11 @@ export default function GroupSettingsPage({ user }) {
     nome_time_b: "Time B",
     dia_jogo_grupo: "Quinta-feira",
     hora_jogo_grupo: "22:30",
-    nome_local_jogo_grupo: ""
+    nome_local_jogo_grupo: "",
+    qtd_times: 2,
+    min_jogadores_time: 5,
+    nome_time_c: "Time C",
+    cor_time_c: "#28a745"
   });
 
   useEffect(() => {
@@ -47,7 +51,11 @@ export default function GroupSettingsPage({ user }) {
         nome_time_b: data.nome_time_b || "Time B",
         dia_jogo_grupo: data.dia_jogo_grupo || "Quinta-feira",
         hora_jogo_grupo: data.hora_jogo_grupo ? data.hora_jogo_grupo.slice(0, 5) : "22:30",
-        nome_local_jogo_grupo: data.nome_local_jogo_grupo || ""
+        nome_local_jogo_grupo: data.nome_local_jogo_grupo || "",
+        qtd_times: data.qtd_times || 2,
+        min_jogadores_time: data.min_jogadores_time || 5,
+        nome_time_c: data.nome_time_c || "Time C",
+        cor_time_c: data.cor_time_c || "#28a745"
       });
     }
     setLoading(false);
@@ -97,7 +105,11 @@ export default function GroupSettingsPage({ user }) {
         nome_time_b: form.nome_time_b,
         dia_jogo_grupo: form.dia_jogo_grupo,
         hora_jogo_grupo: form.hora_jogo_grupo,
-        nome_local_jogo_grupo: form.nome_local_jogo_grupo
+        nome_local_jogo_grupo: form.nome_local_jogo_grupo,
+        qtd_times: Number(form.qtd_times),
+        min_jogadores_time: Number(form.min_jogadores_time),
+        nome_time_c: form.nome_time_c,
+        cor_time_c: form.cor_time_c
       })
       .eq("id_grupo", activeGroup.id_grupo);
 
@@ -128,6 +140,17 @@ export default function GroupSettingsPage({ user }) {
     colorScheme: "light" 
   };
 
+  const time3Disabled = Number(form.qtd_times) === 2;
+
+  // Popups de ajuda
+  const showHelpTimes = () => {
+    alert("Qtd. de Times:\n\nDefina se a sua pelada divide os jogadores em 2 times (partida única tradicional) ou em 3 times (formato rei da quadra, onde quem ganha fica).");
+  };
+
+  const showHelpJogadores = () => {
+    alert("Mínimo de Jogadores:\n\nInforme quantos jogadores formam 1 time na sua quadra (ex: 5 para futsal, 6 para society). O sistema usará este número para separar os titulares dos reservas na hora do sorteio.");
+  };
+
   return (
     <div style={{ width: "100%", maxWidth: "600px", margin: "0 auto", padding: "15px", boxSizing: "border-box", paddingBottom: "40px" }}>
       <style>
@@ -135,6 +158,21 @@ export default function GroupSettingsPage({ user }) {
           .time-input-dark-icon::-webkit-calendar-picker-indicator {
             filter: invert(1);
             cursor: pointer;
+          }
+          .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            color: #64748b;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 6px;
+            border: 1px solid #cbd5e1;
+            font-weight: bold;
           }
         `}
       </style>
@@ -167,7 +205,6 @@ export default function GroupSettingsPage({ user }) {
             <input type="text" value={form.nome_local_jogo_grupo} onChange={(e) => setForm({ ...form, nome_local_jogo_grupo: e.target.value })} style={inputStyle} />
           </div>
 
-          {/* === AJUSTE AQUI: Removido o flexWrap, forçando proporção 2:1 na mesma linha === */}
           <div style={{ display: "flex", gap: "15px", width: "100%" }}>
             <div style={{ flex: "2 1 0", textAlign: "left", minWidth: 0 }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana</label>
@@ -198,37 +235,93 @@ export default function GroupSettingsPage({ user }) {
             {uploadingImage && <div style={{ fontSize: "12px", color: "#007bff", marginTop: "8px", fontWeight: "bold" }}>Enviando imagem... ⏳</div>}
           </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "15px", marginTop: "5px", width: "100%" }}>
+          {/* === CONFIGURAÇÕES DE SORTEIO (Textos curtos + Help) === */}
+          <div style={{ textAlign: "left", background: "#eef2f5", padding: "15px", borderRadius: "8px", border: "1px solid #c2c9d6", width: "100%", boxSizing: "border-box", marginTop: "10px" }}>
+             <h4 style={{ margin: "0 0 15px 0", color: "#333", fontSize: "15px", display: "flex", alignItems: "center", gap: "6px" }}>🎲 Configurações do Sorteio</h4>
+             
+             <div style={{ display: "flex", gap: "15px" }}>
+               <div style={{ flex: "1" }}>
+                 <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "flex", alignItems: "center", marginBottom: "5px" }}>
+                   Qtd. de Times
+                   <span className="help-icon" onClick={showHelpTimes} title="Exibir ajuda">?</span>
+                 </label>
+                 <select 
+                   value={form.qtd_times} 
+                   onChange={(e) => setForm({ ...form, qtd_times: e.target.value })} 
+                   style={inputStyle}
+                 >
+                   <option value={2}>2 Times</option>
+                   <option value={3}>3 Times</option>
+                 </select>
+               </div>
+               
+               <div style={{ flex: "1" }}>
+                 <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "flex", alignItems: "center", marginBottom: "5px" }}>
+                   Min. Jogadores
+                   <span className="help-icon" onClick={showHelpJogadores} title="Exibir ajuda">?</span>
+                 </label>
+                 <input 
+                   type="number" 
+                   min="4" 
+                   max="15" 
+                   value={form.min_jogadores_time} 
+                   onChange={(e) => setForm({ ...form, min_jogadores_time: e.target.value })} 
+                   style={inputStyle} 
+                 />
+               </div>
+             </div>
+          </div>
+
+          {/* === CARDS DE TIMES (Um embaixo do outro, Nome e Cor na mesma linha) === */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "5px", width: "100%" }}>
             
-            <div style={{ flex: "1 1 200px", textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "8px" }}>Time 1 (Interno: A)</label>
-              <input 
-                type="text" 
-                maxLength="8" 
-                value={form.nome_time_a} 
-                onChange={(e) => setForm({ ...form, nome_time_a: e.target.value })} 
-                style={{ ...inputStyle, padding: "8px", marginBottom: "10px", textAlign: "center" }} 
-                placeholder="Máx 8 letras"
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                <input type="color" value={form.cor_time_a} onChange={(e) => setForm({ ...form, cor_time_a: e.target.value })} style={{ width: "35px", height: "35px", border: "none", cursor: "pointer", padding: "0", borderRadius: "4px", background: "none", flexShrink: 0 }} />
-                <span style={{ fontSize: "12px", color: "#333", wordBreak: "break-all" }}>{form.cor_time_a}</span>
+            {/* TIME 1 */}
+            <div style={{ display: "flex", flexDirection: "column", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
+              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", marginBottom: "8px" }}>Time 1 (Interno: A)</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <input 
+                  type="text" 
+                  maxLength="8" 
+                  value={form.nome_time_a} 
+                  onChange={(e) => setForm({ ...form, nome_time_a: e.target.value })} 
+                  style={{ ...inputStyle, padding: "8px", textAlign: "center", flex: 1 }} 
+                  placeholder="Máx 8 letras"
+                />
+                <input type="color" value={form.cor_time_a} onChange={(e) => setForm({ ...form, cor_time_a: e.target.value })} style={{ width: "40px", height: "40px", border: "none", cursor: "pointer", padding: "0", borderRadius: "6px", background: "none", flexShrink: 0 }} title="Cor do Time 1" />
               </div>
             </div>
 
-            <div style={{ flex: "1 1 200px", textAlign: "left", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "8px" }}>Time 2 (Interno: B)</label>
-              <input 
-                type="text" 
-                maxLength="8" 
-                value={form.nome_time_b} 
-                onChange={(e) => setForm({ ...form, nome_time_b: e.target.value })} 
-                style={{ ...inputStyle, padding: "8px", marginBottom: "10px", textAlign: "center" }} 
-                placeholder="Máx 8 letras"
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                <input type="color" value={form.cor_time_b} onChange={(e) => setForm({ ...form, cor_time_b: e.target.value })} style={{ width: "35px", height: "35px", border: "none", cursor: "pointer", padding: "0", borderRadius: "4px", background: "none", flexShrink: 0 }} />
-                <span style={{ fontSize: "12px", color: "#333", wordBreak: "break-all" }}>{form.cor_time_b}</span>
+            {/* TIME 2 */}
+            <div style={{ display: "flex", flexDirection: "column", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
+              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", marginBottom: "8px" }}>Time 2 (Interno: B)</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <input 
+                  type="text" 
+                  maxLength="8" 
+                  value={form.nome_time_b} 
+                  onChange={(e) => setForm({ ...form, nome_time_b: e.target.value })} 
+                  style={{ ...inputStyle, padding: "8px", textAlign: "center", flex: 1 }} 
+                  placeholder="Máx 8 letras"
+                />
+                <input type="color" value={form.cor_time_b} onChange={(e) => setForm({ ...form, cor_time_b: e.target.value })} style={{ width: "40px", height: "40px", border: "none", cursor: "pointer", padding: "0", borderRadius: "6px", background: "none", flexShrink: 0 }} title="Cor do Time 2" />
+              </div>
+            </div>
+
+            {/* TIME 3 */}
+            <div style={{ display: "flex", flexDirection: "column", background: time3Disabled ? "#eaeaea" : "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box", opacity: time3Disabled ? 0.5 : 1, pointerEvents: time3Disabled ? "none" : "auto", transition: "all 0.3s" }}>
+              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", marginBottom: "8px" }}>
+                Time 3 (Interno: C) {time3Disabled && <span style={{ fontSize: "10px", color: "#dc3545", marginLeft: "4px" }}>(Desativado)</span>}
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <input 
+                  type="text" 
+                  maxLength="8" 
+                  value={form.nome_time_c} 
+                  onChange={(e) => setForm({ ...form, nome_time_c: e.target.value })} 
+                  style={{ ...inputStyle, padding: "8px", textAlign: "center", flex: 1 }} 
+                  placeholder="Máx 8 letras"
+                />
+                <input type="color" value={form.cor_time_c} onChange={(e) => setForm({ ...form, cor_time_c: e.target.value })} style={{ width: "40px", height: "40px", border: "none", cursor: "pointer", padding: "0", borderRadius: "6px", background: "none", flexShrink: 0 }} title="Cor do Time 3" />
               </div>
             </div>
 
