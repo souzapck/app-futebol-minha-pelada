@@ -131,8 +131,18 @@ export default function BallVotePage({ user }) {
 
       const now = new Date();
       
-      const horaJogo = activeGroup?.hora_jogo_grupo; /* || "11:00:00"; */
-      const matchStart = new Date(`${match.date}T${horaJogo}-03:00`); 
+      const horaCrua = activeGroup?.hora_jogo_grupo || "21:00:00"; 
+      
+      const [ano, mes, dia] = match.date.split("-").map(Number);
+      const [hora, minuto, segundo] = horaCrua.split(":").map(Number);
+      
+      const matchStart = new Date(ano, mes - 1, dia, hora, minuto, segundo || 0);
+      
+      if (isNaN(matchStart.getTime())) {
+         setTimeLeft("⏳ Erro de leitura de data no seu celular.");
+         setIsVotingOpen(false);
+         return;
+      }
       
       const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000); 
       
@@ -254,6 +264,17 @@ export default function BallVotePage({ user }) {
 
     const selectedMatch = matches.find(m => String(m.id) === String(selectedMatchId));
 
+    // === NOVA ORDENAÇÃO: Time A -> Time B -> Ordem Alfabética ===
+    const sortedPlayers = [...players].sort((a, b) => {
+      const teamA = a.team || "Z"; // Se não tiver time, joga pro fim da fila
+      const teamB = b.team || "Z";
+
+      if (teamA !== teamB) {
+        return teamA.localeCompare(teamB);
+      }
+      return a.name.localeCompare(b.name);
+    });
+
     return (
       <div style={{ background: "#fff", borderRadius: "12px", padding: "16px", border: "1px solid #eee", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
         <h4 style={{ margin: "0 0 15px 0" }}>{round === 1 ? "📝 1º Turno" : "🔥 2º Turno (Desempate)"}</h4>
@@ -276,7 +297,7 @@ export default function BallVotePage({ user }) {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {players.map(p => {
+            {sortedPlayers.map((p, index) => {
               const canCheia = round === 1 || runoffCandidates.cheia.includes(p.id);
               const canMurcha = round === 1 || runoffCandidates.murcha.includes(p.id);
               if (!canCheia && !canMurcha) return null;
@@ -286,13 +307,13 @@ export default function BallVotePage({ user }) {
               const teamName = p.team === "A" ? (selectedMatch?.team_a_name || "Time A") : p.team === "B" ? (selectedMatch?.team_b_name || "Time B") : "";
               const teamColor = p.team === "A" ? (selectedMatch?.team_a_color || "#333") : p.team === "B" ? (selectedMatch?.team_b_color || "#333") : "transparent";
 
+              // Identifica se estamos desenhando o primeiro jogador do Time B para colocar uma linha divisória invisível (margem extra)
+              const isFirstOfTeamB = p.team === "B" && index > 0 && sortedPlayers[index - 1].team === "A";
+
               return (
-                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px", background: "#f8f9fa", borderRadius: "8px", opacity: disableClick ? 0.6 : 1 }}>
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px", background: "#f8f9fa", borderRadius: "8px", opacity: disableClick ? 0.6 : 1, marginTop: isFirstOfTeamB ? "8px" : "0" }}>
                   
-                  {/* === AJUSTE DE LAYOUT AQUI: Coluna para o Texto, liberando espaço === */}
                   <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, paddingRight: "8px" }}>
-                    
-                    {/* Badge do Time agora fica EM CIMA do nome */}
                     {p.team && selectedMatch?.is_drawn && (
                       <span style={{ 
                         color: teamColor, 
@@ -304,7 +325,6 @@ export default function BallVotePage({ user }) {
                         alignItems: "center",
                         gap: "4px"
                       }}>
-                        {/* Bolinha com a cor do time para dar estilo */}
                         <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: teamColor }}></span>
                         {teamName}
                       </span>
@@ -315,7 +335,6 @@ export default function BallVotePage({ user }) {
                     </span>
                   </div>
 
-                  {/* Área dos Botões com flexShrink: 0 para eles não serem amassados na tela pequena */}
                   <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                     {canCheia && (
                       <button 

@@ -69,8 +69,6 @@ export default function MatchesPage({ user }) {
       setStatusMap({});
       setShirtMap({});
       setShowNewMatchForm(false);
-      // === CORREÇÃO: Força o React a atualizar a data assim que o grupo carregar! ===
-      //setNewMatchDate(getNextMatchDate(activeGroup.dia_jogo_grupo));
     }
   }, [activeGroup]);
 
@@ -79,7 +77,7 @@ export default function MatchesPage({ user }) {
       const { data: grupoData } = await supabase
         .from("grupos_pelada")
         .select("dia_jogo_grupo")
-        .eq("id_grupo", activeGroup.id_grupo) // Nota: Se a sua coluna de ID primária no banco chamar apenas "id", troque "id_grupo" por "id" aqui!
+        .eq("id_grupo", activeGroup.id_grupo) 
         .maybeSingle();
 
       if (grupoData && grupoData.dia_jogo_grupo) {
@@ -103,12 +101,13 @@ export default function MatchesPage({ user }) {
       const { data: membrosData, error: membrosError } = await supabase
         .from("grupo_membros")
         .select(`
-          position, rating, shirt_number, is_spectator, is_hidden,
+          position, rating, shirt_number, is_spectator, is_hidden, is_disabled,
           players!inner(id, name)
         `)
         .eq("id_grupo", activeGroup.id_grupo) 
         .eq("is_hidden", false)
         .eq("is_spectator", false)
+        .eq("is_disabled", false) // <--- REGRA NOVA AQUI: Bloqueia jogadores desativados!
         .neq("player_id", 1);
 
       if (membrosError) {
@@ -224,12 +223,14 @@ export default function MatchesPage({ user }) {
       return;
     }
 
+    // Busca apenas os membros ATIVOS para inserir na partida como "sem resposta"
     const { data: membrosData, error: membrosError } = await supabase
       .from("grupo_membros")
       .select("player_id")
       .eq("id_grupo", activeGroup.id_grupo) 
       .eq("is_hidden", false)
       .eq("is_spectator", false)
+      .eq("is_disabled", false) // Impede que o jogador inativo seja inserido no novo jogo
       .neq("player_id", 1);
 
     if (membrosError) {
