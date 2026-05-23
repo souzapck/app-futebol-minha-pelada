@@ -190,7 +190,7 @@ export default function GroupSettingsPage({ user }) {
         }}
       >
         <h3 style={{ marginTop: 0, color: "#007bff", marginBottom: "20px", fontSize: "1.2rem" }}>
-          ⚙️ Configurações da Pelada
+          ⚙️ Configurar Pelada
         </h3>
 
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "15px", width: "100%" }}>

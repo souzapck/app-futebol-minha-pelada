@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import AdminRequestsPage from "./pages/AdminRequestsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
-import GroupSettingsPage from "./pages/GroupSettingsPage.jsx";
+//import GroupSettingsPage from "./pages/GroupSettingsPage.jsx";
 import PlayersPage from "./pages/PlayersPage.jsx";
 import MatchesPage from "./pages/MatchesPage.jsx";
 import TeamsPage from "./pages/TeamsPage.jsx";
@@ -296,27 +296,12 @@ function AppContent() {
             👑 Solicitações
           </button>
         )}        
-        {Number(user.player_id) === 1 && (
-          <button onClick={() => handleChangeView("settings")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "settings" ? "#28a745" : "#eee", color: view === "settings" ? "white" : "#333" }}>
-            ⚙️ Parametrizações
-          </button>
-        )}
         {isAdmin && (
-          <button
-            onClick={() => handleChangeView("group_settings")}
-            style={{
-              padding: "10px 20px",
-              borderRadius: "20px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: "bold",
-              background: view === "group_settings" ? "#28a745" : "#eee",
-              color: view === "group_settings" ? "white" : "#333"
-            }}
-          >
-            ⚙️ Config. Grupo
+          <button onClick={() => handleChangeView("settings")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "settings" ? "#28a745" : "#eee", color: view === "settings" ? "white" : "#333" }}>
+            ⚙️ Configurações
           </button>
         )}
+
         {isAdmin && (
           <button onClick={() => handleChangeView("players")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "players" ? "#28a745" : "#eee", color: view === "players" ? "white" : "#333" }}>
           👤 Jogadores
@@ -338,8 +323,7 @@ function AppContent() {
 
       <main>
         {view === "requests" && Number(user.player_id) === 1 && <AdminRequestsPage />}
-        {view === "settings" && Number(user.player_id) === 1 && <SettingsPage user={user} />}
-        {view === "group_settings" && isAdmin && <GroupSettingsPage user={user} />}
+        {view === "settings" && isAdmin && <SettingsPage user={user} />}
         {view === "players" && isAdmin && <PlayersPage user={user} />}
         {view === "matches" && <MatchesPage user={user} />}
         {view === "teams" && <TeamsPage user={user} />}
