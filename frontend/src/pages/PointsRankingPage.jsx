@@ -16,10 +16,20 @@ export default function PointsRankingPage() {
   const [hoveredPlayerId, setHoveredPlayerId] = useState(null);
   const [hoveredCell, setHoveredCell] = useState(null);
   
-  // Novo estado para saber se a partida selecionada ainda está rolando
   const [isOngoing, setIsOngoing] = useState(false);
 
   const { activeGroup } = useGroup();
+
+  // === VARIÁVEIS DE PONTUAÇÃO DINÂMICAS ===
+  const [pontuacaoConfig, setPontuacaoConfig] = useState({
+    pt_vitoria_ativo: true, pt_vitoria_peso: 3,
+    pt_empate_ativo: true, pt_empate_peso: 1,
+    pt_gol_ativo: true, pt_gol_peso: 0.2,
+    pt_gol_contra_ativo: true, pt_gol_contra_peso: -0.2,
+    pt_assistencia_ativo: true, pt_assistencia_peso: 0.1,
+    pt_bola_cheia_ativo: true, pt_bola_cheia_peso: 0.5,
+    pt_bola_murcha_ativo: true, pt_bola_murcha_peso: -0.5
+  });
 
   useEffect(() => {
     if (activeGroup) {
@@ -31,14 +41,48 @@ export default function PointsRankingPage() {
     if (matches.length > 0) {
       loadRanking();
     } else if (!loading) {
-      // Se carregou e não tem matches, limpa o ranking
       setRanking([]);
     }
-  }, [mode, selectedMatchId, matches]);
+  }, [mode, selectedMatchId, matches, pontuacaoConfig]); // Atualiza se a config mudar
 
   const loadBaseData = async () => {
     setLoading(true);
 
+    // 1. Carrega as Configurações do Banco
+    const { data: configData } = await supabase
+      .from("grupos_pelada")
+      .select(`
+        pt_vitoria_ativo, pt_vitoria_peso,
+        pt_empate_ativo, pt_empate_peso,
+        pt_gol_ativo, pt_gol_peso,
+        pt_gol_contra_ativo, pt_gol_contra_peso,
+        pt_assistencia_ativo, pt_assistencia_peso,
+        pt_bola_cheia_ativo, pt_bola_cheia_peso,
+        pt_bola_murcha_ativo, pt_bola_murcha_peso
+      `)
+      .eq("id_grupo", activeGroup.id_grupo)
+      .single();
+
+    if (configData) {
+      setPontuacaoConfig({
+        pt_vitoria_ativo: configData.pt_vitoria_ativo ?? true,
+        pt_vitoria_peso: Number(configData.pt_vitoria_peso ?? 3),
+        pt_empate_ativo: configData.pt_empate_ativo ?? true,
+        pt_empate_peso: Number(configData.pt_empate_peso ?? 1),
+        pt_gol_ativo: configData.pt_gol_ativo ?? true,
+        pt_gol_peso: Number(configData.pt_gol_peso ?? 0.2),
+        pt_gol_contra_ativo: configData.pt_gol_contra_ativo ?? true,
+        pt_gol_contra_peso: Number(configData.pt_gol_contra_peso ?? -0.2),
+        pt_assistencia_ativo: configData.pt_assistencia_ativo ?? true,
+        pt_assistencia_peso: Number(configData.pt_assistencia_peso ?? 0.1),
+        pt_bola_cheia_ativo: configData.pt_bola_cheia_ativo ?? true,
+        pt_bola_cheia_peso: Number(configData.pt_bola_cheia_peso ?? 0.5),
+        pt_bola_murcha_ativo: configData.pt_bola_murcha_ativo ?? true,
+        pt_bola_murcha_peso: Number(configData.pt_bola_murcha_peso ?? -0.5)
+      });
+    }
+
+    // 2. Carrega as Partidas Fechadas
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
       .select("*")
@@ -65,7 +109,6 @@ export default function PointsRankingPage() {
     setLoading(true);
     setIsOngoing(false);
 
-    // === CORREÇÃO: Carrega os jogadores isolados por pelada via grupo_membros ===
     const { data: membrosData, error: playersError } = await supabase
       .from("grupo_membros")
       .select(`
@@ -75,7 +118,7 @@ export default function PointsRankingPage() {
       .eq("id_grupo", activeGroup.id_grupo)
       .eq("is_hidden", false)
       .neq("player_id", 1)
-      .eq("is_spectator", false); // Espectador não pontua
+      .eq("is_spectator", false); 
 
     if (playersError) {
       console.error("Erro ao carregar jogadores:", playersError);
@@ -83,7 +126,6 @@ export default function PointsRankingPage() {
       return;
     }
 
-    // Achata os dados para o formato original
     const playersData = (membrosData || []).map((m) => ({
       id: m.players.id,
       name: m.players.name,
@@ -106,11 +148,9 @@ export default function PointsRankingPage() {
     const now = new Date();
     const finishedMatches = [];
 
-    // === TRAVA DE TEMPO DINÂMICA (BLOQUEIO DA PARTIDA ATUAL) ===
     const horaJogo = activeGroup?.hora_jogo_grupo ? activeGroup.hora_jogo_grupo.slice(0, 5) + ':00' : "22:30:00";
 
     matchesToUse.forEach((match) => {
-      // Calcula o início do jogo e soma 90 min para o início do 1º turno de votação
       const matchStart = new Date(`${match.date}T${horaJogo}-03:00`);
       const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000);
       
@@ -118,13 +158,11 @@ export default function PointsRankingPage() {
       const t2Start = new Date(t1End.getTime() + INTERVALO);
       const t2End = new Date(t2Start.getTime() + DURACAO_T2);
 
-      // A partida só entra para o cálculo de pontos se o 2º turno já fechou
       if (now > t2End) {
         finishedMatches.push(match);
       }
     });
 
-    // Se no modo "Por Rodada" a partida ainda estiver bloqueada, avisa a UI
     if (matchesToUse.length > 0 && finishedMatches.length === 0) {
       setRanking([]);
       setIsOngoing(true);
@@ -134,7 +172,6 @@ export default function PointsRankingPage() {
 
     const matchIds = finishedMatches.map((m) => m.id);
 
-    // Usa IN nas consultas abaixo, já garantindo o isolamento da pelada, pois matchIds já são filtrados
     const { data: matchPlayersData, error: mpError } = await supabase
       .from("match_player")
       .select("*")
@@ -179,6 +216,7 @@ export default function PointsRankingPage() {
           D: 0,
           GP: 0,
           GC: 0,
+          AS: 0, 
           BC: 0,
           BM: 0,
           PT: 0
@@ -195,7 +233,6 @@ export default function PointsRankingPage() {
       matchPlayersByMatch[item.match_id].push(item);
     });
 
-    // === SEGREGAÇÃO DE VOTOS POR TURNO ===
     const votesByMatch = {};
     (votesData || []).forEach((vote) => {
       if (!votesByMatch[vote.match_id]) {
@@ -208,47 +245,86 @@ export default function PointsRankingPage() {
       }
     });
 
+    // Filtra Pesos Ativos
+    const pV = pontuacaoConfig.pt_vitoria_ativo ? pontuacaoConfig.pt_vitoria_peso : 0;
+    const pE = pontuacaoConfig.pt_empate_ativo ? pontuacaoConfig.pt_empate_peso : 0;
+    const pGP = pontuacaoConfig.pt_gol_ativo ? pontuacaoConfig.pt_gol_peso : 0;
+    const pGC = pontuacaoConfig.pt_gol_contra_ativo ? pontuacaoConfig.pt_gol_contra_peso : 0;
+    const pAS = pontuacaoConfig.pt_assistencia_ativo ? pontuacaoConfig.pt_assistencia_peso : 0;
+    const pBC = pontuacaoConfig.pt_bola_cheia_ativo ? pontuacaoConfig.pt_bola_cheia_peso : 0;
+    const pBM = pontuacaoConfig.pt_bola_murcha_ativo ? pontuacaoConfig.pt_bola_murcha_peso : 0;
+
     finishedMatches.forEach((match) => {
       const playersInMatch = (matchPlayersByMatch[match.id] || []).filter(
-        (item) => item.team === "A" || item.team === "B"
+        (item) => ["A", "B", "C"].includes(item.team)
       );
 
-      // 1. Calcula os pontos da partida (Gols, Vitórias, Derrotas)
+      const is3Teams = Boolean(match.team_c_name);
+      
+      const scores = [
+        { t: "A", s: Number(match.score_a) || 0 },
+        { t: "B", s: Number(match.score_b) || 0 }
+      ];
+      if (is3Teams) scores.push({ t: "C", s: Number(match.score_c) || 0 });
+
+      const teamResult = {}; 
+      const teamPts = {};    
+
+      if (!is3Teams) {
+        if (scores[0].s === scores[1].s) {
+          teamResult["A"] = "E"; teamPts["A"] = pE;
+          teamResult["B"] = "E"; teamPts["B"] = pE;
+        } else if (scores[0].s > scores[1].s) {
+          teamResult["A"] = "V"; teamPts["A"] = pV;
+          teamResult["B"] = "D"; teamPts["B"] = 0;
+        } else {
+          teamResult["A"] = "D"; teamPts["A"] = 0;
+          teamResult["B"] = "V"; teamPts["B"] = pV;
+        }
+      } else {
+        const sorted = [...scores].sort((a, b) => b.s - a.s);
+        const [s1, s2, s3] = sorted;
+
+        if (s1.s === s2.s && s2.s === s3.s) {
+          scores.forEach(x => { teamResult[x.t] = "E"; teamPts[x.t] = pE; });
+        } else if (s1.s === s2.s) {
+          teamResult[s1.t] = "E"; teamPts[s1.t] = pE;
+          teamResult[s2.t] = "E"; teamPts[s2.t] = pE;
+          teamResult[s3.t] = "D"; teamPts[s3.t] = 0;
+        } else if (s2.s === s3.s) {
+          teamResult[s1.t] = "V"; teamPts[s1.t] = pV;
+          teamResult[s2.t] = "E"; teamPts[s2.t] = pE;
+          teamResult[s3.t] = "E"; teamPts[s3.t] = pE;
+        } else {
+          teamResult[s1.t] = "V"; teamPts[s1.t] = pV;
+          teamResult[s2.t] = "E"; teamPts[s2.t] = pE;
+          teamResult[s3.t] = "D"; teamPts[s3.t] = 0;
+        }
+      }
+
       playersInMatch.forEach((item) => {
         const row = ensurePlayer(item.player_id);
         if (!row) return;
 
         const team = item.team;
-        const scoreA = Number(match.score_a) || 0;
-        const scoreB = Number(match.score_b) || 0;
-
-        if (scoreA === scoreB) {
-          row.E += 1;
-          row.PT += 1;
-        } else {
-          const venceu =
-            (team === "A" && scoreA > scoreB) ||
-            (team === "B" && scoreB > scoreA);
-
-          if (venceu) {
-            row.V += 1; 
-            row.PT += 3; 
-          } else {
-            row.D += 1; 
-          }
+        if (teamResult[team]) {
+            row[teamResult[team]] += 1;
+            row.PT += teamPts[team];
         }
 
         const golsPro = Number(item.goals) || 0;
         const golsContra = Number(item.own_goals) || 0;
+        const assistencias = Number(item.assists) || 0; 
 
         row.GP += golsPro;
         row.GC += golsContra;
+        row.AS += assistencias;
 
-        row.PT += golsPro * 0.2;
-        row.PT -= golsContra * 0.2;
+        row.PT += golsPro * pGP;
+        row.PT += golsContra * pGC;
+        row.PT += assistencias * pAS;
       });
 
-      // 2. Calcula os pontos dos Votos (Priorizando o Turno 2 se existir)
       const matchRounds = votesByMatch[match.id] || { round1: [], round2: [] };
       const activeVotes = matchRounds.round2.length > 0 ? matchRounds.round2 : matchRounds.round1;
 
@@ -272,7 +348,7 @@ export default function PointsRankingPage() {
           const row = ensurePlayer(Number(playerId));
           if (!row) return;
           row.BC += 1; 
-          row.PT += 0.5;  
+          row.PT += pBC;  
         }
       });
 
@@ -281,7 +357,7 @@ export default function PointsRankingPage() {
           const row = ensurePlayer(Number(playerId));
           if (!row) return;
           row.BM += 1; 
-          row.PT -= 0.5;  
+          row.PT += pBM;  
         }
       });
     });
@@ -291,7 +367,7 @@ export default function PointsRankingPage() {
     if (mode === "round") {
       const allowedIds = new Set(
         (matchPlayersByMatch[Number(selectedMatchId)] || [])
-          .filter((item) => item.team === "A" || item.team === "B")
+          .filter((item) => ["A", "B", "C"].includes(item.team))
           .map((item) => Number(item.player_id))
       );
 
@@ -318,80 +394,39 @@ export default function PointsRankingPage() {
   };
 
   const titleText = useMemo(() => {
-    if (mode === "general") return "📊 Ranking de Pontuação Geral";
+    if (mode === "general") return "📊 Ranking Geral";
 
     const selected = matches.find((m) => String(m.id) === String(selectedMatchId));
-    if (!selected) return "📊 Ranking de Pontuação por Rodada";
+    if (!selected) return "📊 Ranking da Rodada";
 
-    return `📊 Pontuação da Rodada (${selected.date.split("-").reverse().join("/")})`;
+    return `📊 Rodada (${selected.date.split("-").reverse().join("/")})`;
   }, [mode, matches, selectedMatchId]);
 
   const calcBreakdown = (jogador) => {
     return {
-      V: jogador.V * 3,
-      E: jogador.E * 1,
+      V: jogador.V * (pontuacaoConfig.pt_vitoria_ativo ? pontuacaoConfig.pt_vitoria_peso : 0),
+      E: jogador.E * (pontuacaoConfig.pt_empate_ativo ? pontuacaoConfig.pt_empate_peso : 0),
       D: jogador.D * 0,
-      GP: jogador.GP * 0.2,
-      GC: jogador.GC * -0.2,
-      BC: jogador.BC * 0.5,
-      BM: jogador.BM * -0.5
+      GP: jogador.GP * (pontuacaoConfig.pt_gol_ativo ? pontuacaoConfig.pt_gol_peso : 0),
+      GC: jogador.GC * (pontuacaoConfig.pt_gol_contra_ativo ? pontuacaoConfig.pt_gol_contra_peso : 0),
+      AS: jogador.AS * (pontuacaoConfig.pt_assistencia_ativo ? pontuacaoConfig.pt_assistencia_peso : 0),
+      BC: jogador.BC * (pontuacaoConfig.pt_bola_cheia_ativo ? pontuacaoConfig.pt_bola_cheia_peso : 0),
+      BM: jogador.BM * (pontuacaoConfig.pt_bola_murcha_ativo ? pontuacaoConfig.pt_bola_murcha_peso : 0)
     };
   };
 
-  const renderPointsTooltipPT = (jogador) => {
-    const breakdown = calcBreakdown(jogador);
-
-    return (
-      <div
-        style={{
-          position: "absolute",
-          bottom: "125%",
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "#1f2937",
-          color: "white",
-          padding: "6px 8px",
-          borderRadius: "8px",
-          fontSize: "9px",
-          lineHeight: "1.5",
-          whiteSpace: "nowrap",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-          zIndex: 20,
-          minWidth: "180px",
-          textAlign: "left"
-        }}
-      >
-        <div> 
-          <strong>
-             Contagem de pontos por categoria:
-           </strong>
-        </div>
-        <div> 
-          <strong>
-             V  | E | D | {" "}G.P.{""} | {""}G.C.{""} | {""}B.C.{""} | {""}B.M.{""} 
-           </strong>
-        </div>
-        <hr style={{ borderColor: "rgba(255,255,255,0.2)", margin: "2px 0" }} />
-        <div>
-          <strong>
-            {jogador.V} | {jogador.E} | {jogador.D} | {jogador.GP.toFixed(2)} | {jogador.GC.toFixed(2)} | {jogador.BC.toFixed(2)} | {jogador.BM.toFixed(2)}
-          </strong>
-        </div>
-      </div>
-    );
-  };
-  
   const renderColumnTooltip = (jogador, column) => {
     const breakdown = calcBreakdown(jogador);
 
     const config = {
-      V: { label: "Vitórias", qty: jogador.V, weight: 3, points: breakdown.V },
-      E: { label: "Empates", qty: jogador.E, weight: 1, points: breakdown.E },
+      V: { label: "Vitórias", qty: jogador.V, weight: pontuacaoConfig.pt_vitoria_peso, points: breakdown.V },
+      E: { label: "Empates (ou 2º Lugar)", qty: jogador.E, weight: pontuacaoConfig.pt_empate_peso, points: breakdown.E },
       D: { label: "Derrotas", qty: jogador.D, weight: 0, points: breakdown.D },
-      GP: { label: "Gols Pró", qty: jogador.GP, weight: 0.2, points: breakdown.GP },
-      GC: { label: "Gols Contra", qty: jogador.GC, weight: -0.2, points: breakdown.GC },
-      BC: { label: "Bola Cheia", qty: jogador.BC, weight: 0.5, points: breakdown.BC },
-      BM: { label: "Bola Murcha", qty: jogador.BM, weight: -0.5, points: breakdown.BM },
+      GP: { label: "Gols Pró", qty: jogador.GP, weight: pontuacaoConfig.pt_gol_peso, points: breakdown.GP },
+      GC: { label: "Gols Contra", qty: jogador.GC, weight: pontuacaoConfig.pt_gol_contra_peso, points: breakdown.GC },
+      AS: { label: "Assistências", qty: jogador.AS, weight: pontuacaoConfig.pt_assistencia_peso, points: breakdown.AS },
+      BC: { label: "Bola Cheia", qty: jogador.BC, weight: pontuacaoConfig.pt_bola_cheia_peso, points: breakdown.BC },
+      BM: { label: "Bola Murcha", qty: jogador.BM, weight: pontuacaoConfig.pt_bola_murcha_peso, points: breakdown.BM },
       PT: { label: "Pontuação Total", qty: null, weight: null, points: jogador.PT }
     };
 
@@ -430,9 +465,15 @@ export default function PointsRankingPage() {
           </>
         ) : (
           <>
-            <div>V = {breakdown.V} | E = {breakdown.E} | D = {breakdown.D} |
-                 GP = {breakdown.GP.toFixed(2)}| GC = {breakdown.GC.toFixed(2)} |
-                 BC = {breakdown.BC.toFixed(2)} | BM = {breakdown.BM.toFixed(2)}
+            <div>
+               {pontuacaoConfig.pt_vitoria_ativo && `V = ${breakdown.V.toFixed(1)} | `}
+               {pontuacaoConfig.pt_empate_ativo && `E = ${breakdown.E.toFixed(1)} | `}
+               D = {breakdown.D} | 
+               {pontuacaoConfig.pt_gol_ativo && ` GP = ${breakdown.GP.toFixed(1)} | `}
+               {pontuacaoConfig.pt_gol_contra_ativo && ` GC = ${breakdown.GC.toFixed(1)} | `}
+               {pontuacaoConfig.pt_assistencia_ativo && ` AS = ${breakdown.AS.toFixed(1)} | `}
+               {pontuacaoConfig.pt_bola_cheia_ativo && ` BC = ${breakdown.BC.toFixed(1)} | `}
+               {pontuacaoConfig.pt_bola_murcha_ativo && ` BM = ${breakdown.BM.toFixed(1)}`}
             </div>
             <hr style={{ borderColor: "rgba(255,255,255,0.2)", margin: "6px 0" }} />
             <div><strong>{jogador.PT.toFixed(2)} ponto(s)</strong></div>
@@ -443,8 +484,7 @@ export default function PointsRankingPage() {
   };
 
   const renderHoverCell = (jogador, column, displayValue, textColor = "#333") => {
-    const isOpen =
-      hoveredCell?.playerId === jogador.id && hoveredCell?.column === column;
+    const isOpen = hoveredCell?.playerId === jogador.id && hoveredCell?.column === column;
 
     return (
       <div
@@ -462,7 +502,6 @@ export default function PointsRankingPage() {
         >
           {displayValue}
         </span>
-
         {isOpen && renderColumnTooltip(jogador, column)}
       </div>
     );
@@ -614,13 +653,18 @@ export default function PointsRankingPage() {
                   <th style={{ padding: "8px 2px", textAlign: "center" }}>Pos</th>
                   <th style={{ padding: "8px 2px" }}>Jogador</th>
                   <th style={{ padding: "8px 2px", textAlign: "center" }}>PT</th>
-                  <th style={{ padding: "8px 2px", textAlign: "center" }}>V</th>
-                  <th style={{ padding: "8px 2px", textAlign: "center" }}>E</th>
+                  
+                  {pontuacaoConfig.pt_vitoria_ativo && <th style={{ padding: "8px 2px", textAlign: "center" }}>V</th>}
+                  {pontuacaoConfig.pt_empate_ativo && <th style={{ padding: "8px 2px", textAlign: "center" }}>E</th>}
+                  
+                  {/* Derrota sem toggle (sempre exibe) */}
                   <th style={{ padding: "8px 2px", textAlign: "center" }}>D</th>
-                  <th style={{ padding: "8px 2px", textAlign: "center" }}>GP</th>
-                  <th style={{ padding: "8px 2px", textAlign: "center" }}>GC</th>
-                  <th style={{ padding: "8px 2px", textAlign: "center" }}>BC</th>
-                  <th style={{ padding: "8px 2px", textAlign: "center" }}>BM</th>
+                  
+                  {pontuacaoConfig.pt_gol_ativo && <th style={{ padding: "8px 2px", textAlign: "center" }}>GP</th>}
+                  {pontuacaoConfig.pt_gol_contra_ativo && <th style={{ padding: "8px 2px", textAlign: "center" }}>GC</th>}
+                  {pontuacaoConfig.pt_assistencia_ativo && <th style={{ padding: "8px 2px", textAlign: "center" }}>AS</th>}
+                  {pontuacaoConfig.pt_bola_cheia_ativo && <th style={{ padding: "8px 2px", textAlign: "center" }}>BC</th>}
+                  {pontuacaoConfig.pt_bola_murcha_ativo && <th style={{ padding: "8px 2px", textAlign: "center" }}>BM</th>}
                 </tr>
               </thead>
 
@@ -633,15 +677,7 @@ export default function PointsRankingPage() {
                       backgroundColor: index === 0 ? "#fffbcc" : "transparent"
                     }}
                   >
-                    <td
-                      style={{
-                        padding: "6px 2px",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                        color: "#555",
-                        whiteSpace: "nowrap"
-                      }}
-                    >
+                    <td style={{ padding: "6px 2px", textAlign: "center", fontWeight: "bold", color: "#555", whiteSpace: "nowrap" }}>
                       {getPosLabel(index)}
                     </td>
 
@@ -649,9 +685,7 @@ export default function PointsRankingPage() {
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         <span>
                           <span style={{ color: "#007bff", marginRight: "5px" }}>
-                            {jogador.shirt_number
-                              ? String(jogador.shirt_number).padStart(2, "0")
-                              : "--"}
+                            {jogador.shirt_number ? String(jogador.shirt_number).padStart(2, "0") : "--"}
                           </span>
                           {jogador.name}
                         </span>
@@ -661,42 +695,50 @@ export default function PointsRankingPage() {
                       </div>
                     </td>
 
-                    <td
-                      style={{
-                        padding: "6px 2px",
-                        textAlign: "center",
-                        fontSize: "14px"
-                      }}
-                    >
-                      {renderHoverCell(
-                        jogador,
-                        "PT",
-                        jogador.PT.toFixed(1),
-                        jogador.PT >= 0 ? "#1565c0" : "#dc3545"
-                      )}
+                    <td style={{ padding: "6px 2px", textAlign: "center", fontSize: "14px" }}>
+                      {renderHoverCell(jogador, "PT", jogador.PT.toFixed(1), jogador.PT >= 0 ? "#1565c0" : "#dc3545")}
                     </td>  
 
-                    <td style={{ padding: "6px 2px", textAlign: "center" }}>                  
-                      {renderHoverCell(jogador, "V", jogador.V, "#2e7d32")}                                  
-                    </td>
-                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
-                      {renderHoverCell(jogador, "E", jogador.E, "#6c757d")}
-                    </td>
+                    {pontuacaoConfig.pt_vitoria_ativo && (
+                      <td style={{ padding: "6px 2px", textAlign: "center" }}>                  
+                        {renderHoverCell(jogador, "V", jogador.V, "#2e7d32")}                                  
+                      </td>
+                    )}
+                    {pontuacaoConfig.pt_empate_ativo && (
+                      <td style={{ padding: "6px 2px", textAlign: "center" }}>
+                        {renderHoverCell(jogador, "E", jogador.E, "#6c757d")}
+                      </td>
+                    )}
+
                     <td style={{ padding: "6px 2px", textAlign: "center" }}>
                       {renderHoverCell(jogador, "D", jogador.D, "#999")}
                     </td>
-                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
-                      {renderHoverCell(jogador, "GP", jogador.GP, "#198754")}
-                    </td>
-                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
-                      {renderHoverCell(jogador, "GC", jogador.GC, "#dc3545")}
-                    </td>
-                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
-                      {renderHoverCell(jogador, "BC", jogador.BC, "#2e7d32")}
-                    </td>
-                    <td style={{ padding: "6px 2px", textAlign: "center" }}>
-                      {renderHoverCell(jogador, "BM", jogador.BM, "#8e24aa")}
-                    </td>
+
+                    {pontuacaoConfig.pt_gol_ativo && (
+                      <td style={{ padding: "6px 2px", textAlign: "center" }}>
+                        {renderHoverCell(jogador, "GP", jogador.GP, "#198754")}
+                      </td>
+                    )}
+                    {pontuacaoConfig.pt_gol_contra_ativo && (
+                      <td style={{ padding: "6px 2px", textAlign: "center" }}>
+                        {renderHoverCell(jogador, "GC", jogador.GC, "#dc3545")}
+                      </td>
+                    )}
+                    {pontuacaoConfig.pt_assistencia_ativo && (
+                      <td style={{ padding: "6px 2px", textAlign: "center" }}>
+                        {renderHoverCell(jogador, "AS", jogador.AS, "#0d6efd")}
+                      </td>
+                    )}
+                    {pontuacaoConfig.pt_bola_cheia_ativo && (
+                      <td style={{ padding: "6px 2px", textAlign: "center" }}>
+                        {renderHoverCell(jogador, "BC", jogador.BC, "#2e7d32")}
+                      </td>
+                    )}
+                    {pontuacaoConfig.pt_bola_murcha_ativo && (
+                      <td style={{ padding: "6px 2px", textAlign: "center" }}>
+                        {renderHoverCell(jogador, "BM", jogador.BM, "#8e24aa")}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -717,14 +759,15 @@ export default function PointsRankingPage() {
             }}
           >
             <div><strong>Mapa de contagem da pontuação:</strong></div>
-            <div><strong>PT</strong> = Pontos Total, soma total de pontos do jogador.</div>
-            <div><strong>V</strong> = Vitórias, tem peso 3 pontos.</div>
-            <div><strong>E</strong> = Empates, tem peso 1 ponto.</div>
-            <div><strong>D</strong> = Derrotas, tem peso 0 ponto.</div>
-            <div><strong>GP</strong> = Gols Pró, tem peso 0,2 ponto por gol.</div>
-            <div><strong>GC</strong> = Gols Contra, tem peso -0,2 ponto por gol contra.</div>
-            <div><strong>BC</strong> = Bola Cheia, tem peso 0,5 ponto.</div>
-            <div><strong>BM</strong> = Bola Murcha, tem peso -0,5 ponto.</div>
+            <div><strong>PT</strong> = Pontos Total.</div>
+            {pontuacaoConfig.pt_vitoria_ativo && <div><strong>V</strong> = Vitórias, tem peso {pontuacaoConfig.pt_vitoria_peso} pontos.</div>}
+            {pontuacaoConfig.pt_empate_ativo && <div><strong>E</strong> = Empates (ou 2º lugar), tem peso {pontuacaoConfig.pt_empate_peso} ponto.</div>}
+            <div><strong>D</strong> = Derrotas, não pontua.</div>
+            {pontuacaoConfig.pt_gol_ativo && <div><strong>GP</strong> = Gols Pró, tem peso {String(pontuacaoConfig.pt_gol_peso).replace(".", ",")} ponto por gol.</div>}
+            {pontuacaoConfig.pt_gol_contra_ativo && <div><strong>GC</strong> = Gols Contra, tem peso {String(pontuacaoConfig.pt_gol_contra_peso).replace(".", ",")} ponto por gol contra.</div>}
+            {pontuacaoConfig.pt_assistencia_ativo && <div><strong>AS</strong> = Assistências, tem peso {String(pontuacaoConfig.pt_assistencia_peso).replace(".", ",")} ponto por assistência.</div>}
+            {pontuacaoConfig.pt_bola_cheia_ativo && <div><strong>BC</strong> = Bola Cheia, tem peso {String(pontuacaoConfig.pt_bola_cheia_peso).replace(".", ",")} ponto.</div>}
+            {pontuacaoConfig.pt_bola_murcha_ativo && <div><strong>BM</strong> = Bola Murcha, tem peso {String(pontuacaoConfig.pt_bola_murcha_peso).replace(".", ",")} ponto.</div>}
           </div>
         </>
       )}

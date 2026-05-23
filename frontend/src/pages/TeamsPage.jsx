@@ -58,6 +58,7 @@ export default function TeamsPage({ user }) {
   
   const [goals, setGoals] = useState({});
   const [ownGoals, setOwnGoals] = useState({});
+  const [assists, setAssists] = useState({});
   const [shirtMap, setShirtMap] = useState({});
   const [confirmedList, setConfirmedList] = useState([]);
 
@@ -75,11 +76,12 @@ export default function TeamsPage({ user }) {
   const [config, setConfig] = useState({
     cor_a: "#0b0b0b", cor_b: "#c00707", cor_c: "#28a745",
     nome_a: "Time A", nome_b: "Time B", nome_c: "Time C",
-    qtd_times: 2, dia_jogo: "QUINTA-FEIRA"
+    qtd_times: 2, dia_jogo: "QUINTA-FEIRA",
+    pt_vitoria_ativo: true, pt_gol_ativo: true, 
+    pt_gol_contra_ativo: true, pt_assistencia_ativo: true
   });
 
   // === LÓGICA DE DETECÇÃO DE HISTÓRICO ===
-  // Se o jogo está fechado, usamos os dados do jogo. Se está aberto, usamos a config do grupo.
   const displayCorA = (selectedMatch?.is_drawn && selectedMatch?.team_a_color) ? selectedMatch.team_a_color : config.cor_a;
   const displayCorB = (selectedMatch?.is_drawn && selectedMatch?.team_b_color) ? selectedMatch.team_b_color : config.cor_b;
   const displayCorC = (selectedMatch?.is_drawn && selectedMatch?.team_c_color) ? selectedMatch.team_c_color : config.cor_c;
@@ -88,10 +90,9 @@ export default function TeamsPage({ user }) {
   const displayNomeB = (selectedMatch?.is_drawn && selectedMatch?.team_b_name) ? selectedMatch.team_b_name : config.nome_b;
   const displayNomeC = (selectedMatch?.is_drawn && selectedMatch?.team_c_name) ? selectedMatch.team_c_name : config.nome_c;
 
-  // A variável mais importante da página: Ela decide dinamicamente se a visualização atual terá 2 ou 3 times.
-  const displayQtdTimes = selectedMatch?.is_drawn 
-    ? (selectedMatch.team_c_name ? 3 : 2) // Se for partida antiga, olha se o Time C foi salvo no banco.
-    : config.qtd_times;                   // Se for escalação nova (jogo aberto), olha a config atual do grupo.
+  const isTresTimes = selectedMatch?.is_drawn 
+    ? Boolean(selectedMatch.team_c_name && selectedMatch.team_c_name.trim() !== "")
+    : Number(config.qtd_times) === 3;                  
 
   useEffect(() => {
     if (activeGroup) {
@@ -114,7 +115,7 @@ export default function TeamsPage({ user }) {
     try {
       const { data } = await supabase
         .from("grupos_pelada")
-        .select("cor_time_a, cor_time_b, cor_time_c, nome_time_a, nome_time_b, nome_time_c, dia_jogo_grupo, qtd_times")
+        .select("cor_time_a, cor_time_b, cor_time_c, nome_time_a, nome_time_b, nome_time_c, dia_jogo_grupo, qtd_times, pt_vitoria_ativo, pt_gol_ativo, pt_gol_contra_ativo, pt_assistencia_ativo")
         .eq("id_grupo", activeGroup.id_grupo)
         .single();
 
@@ -127,7 +128,11 @@ export default function TeamsPage({ user }) {
           nome_b: data.nome_time_b || "Time B",
           nome_c: data.nome_time_c || "Time C",
           qtd_times: data.qtd_times || 2,
-          dia_jogo: data.dia_jogo_grupo || "QUINTA-FEIRA"
+          dia_jogo: data.dia_jogo_grupo || "QUINTA-FEIRA",
+          pt_vitoria_ativo: data.pt_vitoria_ativo !== false,
+          pt_gol_ativo: data.pt_gol_ativo !== false,
+          pt_gol_contra_ativo: data.pt_gol_contra_ativo !== false,
+          pt_assistencia_ativo: data.pt_assistencia_ativo !== false
         });
       }
     } catch (err) {
@@ -141,6 +146,7 @@ export default function TeamsPage({ user }) {
     fixed_shirt_number: player.shirt_number ?? null, phone: player.phone,
     status: matchItem?.status ?? null, team: matchItem?.team ?? null,
     goals: matchItem?.goals || 0, own_goals: matchItem?.own_goals || 0,
+    assists: matchItem?.assists || 0,
     post_draw_action: matchItem?.post_draw_action ?? null,
     replaced_by_player_id: matchItem?.replaced_by_player_id ?? null,
     replaced_player_id: matchItem?.replaced_player_id ?? null
@@ -211,20 +217,24 @@ export default function TeamsPage({ user }) {
       setScoreB(match.score_b || 0);
       setScoreC(match.score_c || 0);
       
-      const goalsMap = {}; const ownGoalsMap = {};
-      playersInTeams.forEach((p) => { goalsMap[p.id] = p.goals || 0; ownGoalsMap[p.id] = p.own_goals || 0; });
-      setGoals(goalsMap); setOwnGoals(ownGoalsMap);
+      const goalsMap = {}; const ownGoalsMap = {}; const assistsMap = {};
+      playersInTeams.forEach((p) => { 
+        goalsMap[p.id] = p.goals || 0; 
+        ownGoalsMap[p.id] = p.own_goals || 0; 
+        assistsMap[p.id] = p.assists || 0;
+      });
+      setGoals(goalsMap); setOwnGoals(ownGoalsMap); setAssists(assistsMap);
     } else {
       setTeamA([]); setTeamB([]); setTeamC([]); 
       setScoreA(0); setScoreB(0); setScoreC(0);
-      setGoals({}); setOwnGoals({});
+      setGoals({}); setOwnGoals({}); setAssists({});
     }
 
     setActionMenuPlayerId(null); setReplacementModalOpen(false); setPlayerToReplace(null); setReplacementOptions([]); setSelectedReplacementId(""); setModalMode(null); setTargetTeam(null);
   };
 
   const sortearTimes = () => {
-    if (players.length < config.qtd_times) { 
+    if (players.length < Number(config.qtd_times)) { 
         alert(`Não há jogadores suficientes para preencher os ${config.qtd_times} times!`); 
         return; 
     }
@@ -246,8 +256,7 @@ export default function TeamsPage({ user }) {
       return porPosicao;
     };
 
-    // --- LÓGICA PARA 3 TIMES ---
-    if (config.qtd_times === 3) {
+    if (Number(config.qtd_times) === 3) {
       const porPosicao = agruparPorPosicao();
 
       const addToTeam3 = (player, team) => {
@@ -293,7 +302,6 @@ export default function TeamsPage({ user }) {
       return;
     }
 
-    // --- LÓGICA PARA 2 TIMES ---
     const porPosicao = agruparPorPosicao();
 
     const addToTeam = (player, team) => {
@@ -360,32 +368,30 @@ export default function TeamsPage({ user }) {
       const updatesB = teamB.map((p) => supabase.from("match_player").update({ team: "B", shirt_number: shirtMap[p.id] === "" ? null : Number(shirtMap[p.id]) }).eq("match_id", selectedMatch.id).eq("player_id", p.id));
       
       let updatesC = [];
-      if (config.qtd_times === 3) {
+      if (Number(config.qtd_times) === 3) {
         updatesC = teamC.map((p) => supabase.from("match_player").update({ team: "C", shirt_number: shirtMap[p.id] === "" ? null : Number(shirtMap[p.id]) }).eq("match_id", selectedMatch.id).eq("player_id", p.id));
       }
       
       await Promise.all([...updatesA, ...updatesB, ...updatesC]);
 
-      // Salva NULO se a partida for de 2 times. Isso garante a leitura perfeita no histórico futuro!
       await supabase.from("matches").update({ 
           is_drawn: true, 
           team_a_name: config.nome_a, team_a_color: config.cor_a, 
           team_b_name: config.nome_b, team_b_color: config.cor_b,
-          team_c_name: config.qtd_times === 3 ? config.nome_c : null, 
-          team_c_color: config.qtd_times === 3 ? config.cor_c : null 
+          team_c_name: Number(config.qtd_times) === 3 ? config.nome_c : null, 
+          team_c_color: Number(config.qtd_times) === 3 ? config.cor_c : null 
       }).eq("id", selectedMatch.id);
       
       alert("✅ Sorteio confirmado e jogo travado!");
       await loadMatches();
       
-      // Recarrega o estado emulando o que acabou de ser gravado no banco
       await loadMatchData({ 
         ...selectedMatch, 
         is_drawn: true, 
         team_a_name: config.nome_a, team_a_color: config.cor_a, 
         team_b_name: config.nome_b, team_b_color: config.cor_b, 
-        team_c_name: config.qtd_times === 3 ? config.nome_c : null, 
-        team_c_color: config.qtd_times === 3 ? config.cor_c : null 
+        team_c_name: Number(config.qtd_times) === 3 ? config.nome_c : null, 
+        team_c_color: Number(config.qtd_times) === 3 ? config.cor_c : null 
       });
     } catch (error) { console.error(error); alert("❌ Erro ao confirmar o sorteio."); }
   };
@@ -436,8 +442,8 @@ export default function TeamsPage({ user }) {
       const substituto = replacementOptions.find((item) => Number(item.id) === Number(replacementId));
       const camisaFinal = substituto?.fixed_shirt_number !== null && substituto?.fixed_shirt_number !== undefined && substituto?.fixed_shirt_number !== "" ? substituto.fixed_shirt_number : null;
 
-      await supabase.from("match_player").update({ team: null, goals: 0, own_goals: 0, shirt_number: null, post_draw_action: "substituido", replaced_by_player_id: replacementId }).eq("match_id", selectedMatch.id).eq("player_id", playerToReplace.id);
-      await supabase.from("match_player").update({ team: playerToReplace.team, goals: 0, own_goals: 0, shirt_number: camisaFinal, post_draw_action: "incluido", replaced_player_id: playerToReplace.id }).eq("match_id", selectedMatch.id).eq("player_id", replacementId);
+      await supabase.from("match_player").update({ team: null, goals: 0, own_goals: 0, assists: 0, shirt_number: null, post_draw_action: "substituido", replaced_by_player_id: replacementId }).eq("match_id", selectedMatch.id).eq("player_id", playerToReplace.id);
+      await supabase.from("match_player").update({ team: playerToReplace.team, goals: 0, own_goals: 0, assists: 0, shirt_number: camisaFinal, post_draw_action: "incluido", replaced_player_id: playerToReplace.id }).eq("match_id", selectedMatch.id).eq("player_id", replacementId);
 
       alert("✅ Substituição realizada!");
       cancelarSubstituicao();
@@ -452,7 +458,7 @@ export default function TeamsPage({ user }) {
       const jogador = replacementOptions.find((item) => Number(item.id) === Number(replacementId));
       const camisaFinal = jogador?.fixed_shirt_number !== null && jogador?.fixed_shirt_number !== undefined && jogador?.fixed_shirt_number !== "" ? jogador.fixed_shirt_number : null;
 
-      await supabase.from("match_player").update({ team: targetTeam, goals: 0, own_goals: 0, shirt_number: camisaFinal, post_draw_action: "incluido", replaced_player_id: null }).eq("match_id", selectedMatch.id).eq("player_id", replacementId);
+      await supabase.from("match_player").update({ team: targetTeam, goals: 0, own_goals: 0, assists: 0, shirt_number: camisaFinal, post_draw_action: "incluido", replaced_player_id: null }).eq("match_id", selectedMatch.id).eq("player_id", replacementId);
 
       alert("✅ Jogador incluído!");
       cancelarSubstituicao();
@@ -464,7 +470,7 @@ export default function TeamsPage({ user }) {
     if (!selectedMatch) return;
     if (!window.confirm(`🗑️ Excluir ${player.name} da escalação?`)) return;
     try {
-      await supabase.from("match_player").update({ team: null, goals: 0, own_goals: 0, shirt_number: null, post_draw_action: "excluido", replaced_by_player_id: null }).eq("match_id", selectedMatch.id).eq("player_id", player.id);
+      await supabase.from("match_player").update({ team: null, goals: 0, own_goals: 0, assists: 0, shirt_number: null, post_draw_action: "excluido", replaced_by_player_id: null }).eq("match_id", selectedMatch.id).eq("player_id", player.id);
       setActionMenuPlayerId(null);
       alert("✅ Jogador excluído!");
       await loadMatchData(selectedMatch);
@@ -474,7 +480,7 @@ export default function TeamsPage({ user }) {
   const desfazerSorteio = async () => {
     if (!window.confirm("⚠️ Deseja REABRIR esta partida?")) return;
     try {
-      await supabase.from("match_player").update({ team: null, goals: 0, own_goals: 0, post_draw_action: null, replaced_by_player_id: null, replaced_player_id: null }).eq("match_id", selectedMatch.id);
+      await supabase.from("match_player").update({ team: null, goals: 0, own_goals: 0, assists: 0, post_draw_action: null, replaced_by_player_id: null, replaced_player_id: null }).eq("match_id", selectedMatch.id);
       await supabase.from("matches").update({ is_drawn: false, score_a: 0, score_b: 0, score_c: 0, team_a_name: null, team_a_color: null, team_b_name: null, team_b_color: null, team_c_name: null, team_c_color: null }).eq("id", selectedMatch.id);
       
       alert("✅ Jogo reaberto!");
@@ -485,21 +491,28 @@ export default function TeamsPage({ user }) {
 
   const handleGoalChange = (playerId, amount) => { setGoals((prev) => ({ ...prev, [playerId]: Math.max(0, parseInt(amount) || 0) })); };
   const handleOwnGoalChange = (playerId, amount) => { setOwnGoals((prev) => ({ ...prev, [playerId]: Math.max(0, parseInt(amount) || 0) })); };
+  const handleAssistsChange = (playerId, amount) => { setAssists((prev) => ({ ...prev, [playerId]: Math.max(0, parseInt(amount) || 0) })); };
 
   const salvarEstatisticas = async () => {
     try {
       await supabase.from("matches").update({ 
         score_a: Number(scoreA), 
         score_b: Number(scoreB), 
-        score_c: displayQtdTimes === 3 ? Number(scoreC) : 0 
+        score_c: isTresTimes ? Number(scoreC) : 0 
       }).eq("id", selectedMatch.id);
       
-      const playerIds = Array.from(new Set([...Object.keys(goals), ...Object.keys(ownGoals)]));
-      const goalUpdates = playerIds.map((playerId) => supabase.from("match_player").update({ goals: Number(goals[playerId]) || 0, own_goals: Number(ownGoals[playerId]) || 0 }).eq("match_id", selectedMatch.id).eq("player_id", Number(playerId)));
-      await Promise.all(goalUpdates);
+      const playerIds = Array.from(new Set([...Object.keys(goals), ...Object.keys(ownGoals), ...Object.keys(assists)]));
+      const statsUpdates = playerIds.map((playerId) => 
+        supabase.from("match_player").update({ 
+          goals: Number(goals[playerId]) || 0, 
+          own_goals: Number(ownGoals[playerId]) || 0,
+          assists: Number(assists[playerId]) || 0 
+        }).eq("match_id", selectedMatch.id).eq("player_id", Number(playerId))
+      );
+      await Promise.all(statsUpdates);
 
       alert("✅ Estatísticas do jogo salvas!");
-      await loadMatchData({ ...selectedMatch, score_a: Number(scoreA), score_b: Number(scoreB), score_c: displayQtdTimes === 3 ? Number(scoreC) : 0 });
+      await loadMatchData({ ...selectedMatch, score_a: Number(scoreA), score_b: Number(scoreB), score_c: isTresTimes ? Number(scoreC) : 0 });
     } catch (error) { console.error(error); alert("❌ Erro."); }
   };
 
@@ -516,7 +529,7 @@ export default function TeamsPage({ user }) {
         { nome: displayNomeA, cor: displayCorA, time: teamA },
         { nome: displayNomeB, cor: displayCorB, time: teamB }
     ];
-    if (displayQtdTimes === 3) {
+    if (isTresTimes) {
         timesToRender.push({ nome: displayNomeC, cor: displayCorC, time: teamC });
     }
 
@@ -557,7 +570,7 @@ export default function TeamsPage({ user }) {
         </div>
       )}
 
-      {selectedMatch.is_drawn && (
+      {selectedMatch.is_drawn && config.pt_vitoria_ativo && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "12px", background: "#e9ecef", padding: "6px", borderRadius: "8px" }}>
           <label style={{ fontWeight: "bold", marginRight: "10px", color: "#333", fontSize: "14px" }}>Placar (Vitórias):</label>
           <input type="number" value={score} onChange={(e) => setScore(e.target.value)} style={{ width: "50px", textAlign: "center", fontSize: "18px", fontWeight: "bold", padding: "4px", borderRadius: "6px", border: "1px solid #ccc", color: "#000", backgroundColor: "#fff" }} />
@@ -565,33 +578,46 @@ export default function TeamsPage({ user }) {
       )}
 
       {selectedMatch.is_drawn && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", fontSize: "11px", fontWeight: "bold", color: "#666" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "8px", fontSize: "11px", fontWeight: "bold", color: "#666" }}>
           <span>Jogador</span>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <span style={{ width: "30px", textAlign: "center", fontSize: "14px" }} title="Gols Marcados">⚽</span>
-            <span style={{ width: "30px", textAlign: "center", fontSize: "14px" }} title="Gols Contra">🥅</span>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            {config.pt_gol_ativo && <span style={{ width: "30px", textAlign: "center", fontSize: "14px" }} title="Gols Marcados">⚽</span>}
+            {config.pt_gol_contra_ativo && <span style={{ width: "30px", textAlign: "center", fontSize: "14px" }} title="Gols Contra">🥅</span>}
+            {config.pt_assistencia_ativo && <span style={{ width: "30px", textAlign: "center", fontSize: "14px" }} title="Assistências (AS)">👟</span>}
             {isAdmin && <span style={{ width: "24px", textAlign: "center" }}></span>}
           </div>
         </div>
       )}
 
       {ordenarPorPosicao(team).filter(Boolean).map((p) => (
-        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f1f1", alignItems: "center", fontSize: "15px", color: "#333", gap: "5px" }}>
-          <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-            <div style={{ width: "33px", minWidth: "33px", display: "flex", justifyContent: "flex-end", marginRight: "7px" }}>
-              {p.fixed_shirt_number ? (
-                <span style={{ width: "30px", textAlign: "center", fontWeight: "bold", fontSize: "10px", color: "#333", display: "inline-block" }}>{String(p.shirt_number).padStart(2, "0")}</span>
-              ) : (
-                <input type="number" min="0" max="99" value={shirtMap?.[p.id] ?? ""} onChange={(e) => handleShirtChange(p.id, e.target.value)} disabled={selectedMatch.is_drawn} style={{ width: "42px", padding: "3px", textAlign: "center", borderRadius: "4px", border: "1px solid #999", backgroundColor: "#fff", color: "#000", fontWeight: "bold", fontSize: "10px", outline: "none", boxSizing: "border-box" }} placeholder=" " />
-              )}
+        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f1f1", alignItems: "center", fontSize: "15px", color: "#333", gap: "5px" }}>
+          
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, gap: "4px" }}>
+            <span style={{ textAlign: "left", fontSize: "13px", fontWeight: "bold", color: "#333", lineHeight: "1.2", wordWrap: "break-word" }}>
+              {p.name}
+            </span>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: "33px", display: "flex", justifyContent: "flex-start" }}>
+                {p.fixed_shirt_number ? (
+                  <span style={{ width: "30px", textAlign: "center", fontWeight: "bold", fontSize: "11px", color: "#555", background: "#f1f1f1", padding: "2px", borderRadius: "4px", display: "inline-block" }}>
+                    {String(p.shirt_number).padStart(2, "0")}
+                  </span>
+                ) : (
+                  <input type="number" min="0" max="99" value={shirtMap?.[p.id] ?? ""} onChange={(e) => handleShirtChange(p.id, e.target.value)} disabled={selectedMatch.is_drawn} style={{ width: "38px", padding: "2px", textAlign: "center", borderRadius: "4px", border: "1px solid #999", backgroundColor: "#fff", color: "#000", fontWeight: "bold", fontSize: "11px", outline: "none", boxSizing: "border-box" }} placeholder="-" />
+                )}
+              </div>
+              <span style={{ fontSize: "11px", fontWeight: "600", color: "#666" }}>
+                {p.position}
+              </span>
             </div>
-            <span style={{ textAlign: "left", fontSize: "10px", fontWeight: "500", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{`(${p.position}) - ${p.name}`}</span>
           </div>
 
           {selectedMatch.is_drawn && (
             <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-              <input type="number" min="0" value={goals?.[p.id] || 0} onChange={(e) => handleGoalChange(p.id, e.target.value)} style={{ width: "30px", padding: "3px", textAlign: "center", borderRadius: "4px", border: "1px solid #999", backgroundColor: "#f8f9fa", color: "#048804", fontWeight: "bold", fontSize: "11px", outline: "none" }} />
-              <input type="number" min="0" value={ownGoals?.[p.id] || 0} onChange={(e) => handleOwnGoalChange(p.id, e.target.value)} style={{ width: "30px", padding: "3px", textAlign: "center", borderRadius: "4px", border: "1px solid #c77d7d", backgroundColor: "#fff5f5", color: "#8b0000", fontWeight: "bold", fontSize: "11px", outline: "none" }} />
+              {config.pt_gol_ativo && <input type="number" min="0" value={goals?.[p.id] || 0} onChange={(e) => handleGoalChange(p.id, e.target.value)} style={{ width: "30px", padding: "3px", textAlign: "center", borderRadius: "4px", border: "1px solid #999", backgroundColor: "#f8f9fa", color: "#048804", fontWeight: "bold", fontSize: "11px", outline: "none" }} />}
+              {config.pt_gol_contra_ativo && <input type="number" min="0" value={ownGoals?.[p.id] || 0} onChange={(e) => handleOwnGoalChange(p.id, e.target.value)} style={{ width: "30px", padding: "3px", textAlign: "center", borderRadius: "4px", border: "1px solid #c77d7d", backgroundColor: "#fff5f5", color: "#8b0000", fontWeight: "bold", fontSize: "11px", outline: "none" }} />}
+              {config.pt_assistencia_ativo && <input type="number" min="0" value={assists?.[p.id] || 0} onChange={(e) => handleAssistsChange(p.id, e.target.value)} style={{ width: "30px", padding: "3px", textAlign: "center", borderRadius: "4px", border: "1px solid #999", backgroundColor: "#f8f9fa", color: "#0d6efd", fontWeight: "bold", fontSize: "11px", outline: "none" }} />}
               {renderActionMenu(p)}
             </div>
           )}
@@ -605,7 +631,7 @@ export default function TeamsPage({ user }) {
       
       <div style={{ overflowX: "auto", gap: "10px", marginBottom: "20px", paddingBottom: "10px" }}>
         {matches.map((m) => (
-          <button key={m.id} onClick={() => loadMatchData(m)} style={{ marginBottom: "5px", marginInline: "3px", padding: "12px", borderRadius: "15px", cursor: "pointer", border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd", background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff", color: "#333", fontWeight: selectedMatch?.id === m.id ? "bold" : "normal", whiteSpace: "nowrap" }}>
+          <button key={m.id} onClick={() => loadMatchData(m)} style={{  marginBottom: "5px", marginInline: "3px", padding: "12px", borderRadius: "15px", cursor: "pointer", border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd", background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff", color: "#333", fontWeight: selectedMatch?.id === m.id ? "bold" : "normal", whiteSpace: "nowrap" }}>
             {m.date.split("-").reverse().join("/")} {m.is_drawn && "🔒"}
           </button>
         ))}
@@ -614,7 +640,7 @@ export default function TeamsPage({ user }) {
       {selectedMatch && (
         <div style={{ width: "100%", background: "#f8f9fa", padding: "20px", borderRadius: "12px", border: "1px solid #dddddd", boxSizing: "border-box" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-            <h2 style={{ margin: 0, color: "#333", fontSize: "18px" }}>{selectedMatch.is_drawn ? "🔒 Jogo Fechado" : "🎲 Escalação não realizada"}</h2>
+            <h2 style={{ margin: 0, color: "#333", fontSize: "18px" }}>{selectedMatch.is_drawn ? "🔒 Jogo Fechado" : "🎲 Escalação"}</h2>
             {teamA.length > 0 && <button onClick={copiarWhatsApp} style={{ background: "#25D366", color: "white", padding: "10px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", boxShadow: "0 2px 5px rgba(37,211,102,0.3)", fontSize: "13px" }}>📱 WhatsApp</button>}
           </div>
 
@@ -622,7 +648,7 @@ export default function TeamsPage({ user }) {
             <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "25px", width: "100%" }}>
               {renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorA }}></span> {displayNomeA}</>, displayCorA, teamA, scoreA, setScoreA, "A")}
               {renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorB }}></span> {displayNomeB}</>, displayCorB, teamB, scoreB, setScoreB, "B")}
-              {displayQtdTimes === 3 && renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorC }}></span> {displayNomeC}</>, displayCorC, teamC, scoreC, setScoreC, "C")}
+              {isTresTimes && renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorC }}></span> {displayNomeC}</>, displayCorC, teamC, scoreC, setScoreC, "C")}
             </div>
           )}
 
@@ -630,20 +656,21 @@ export default function TeamsPage({ user }) {
             <>
               {!selectedMatch.is_drawn ? (
                 <div style={{ display: "flex", gap: "12px", flexDirection: "column", background: "#fff", padding: "15px", borderRadius: "10px", border: "1px solid #dee2e6" }}>
-                  {teamA.length === 0 && <button onClick={sortearTimes} style={{ width: "100%", padding: "16px", background: "#007bff", color: "white", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: "bold", boxShadow: "0 4px 6px rgba(0,123,255,0.2)" }}>🎲 Sortear Times Equilibrados</button>}
+                  {teamA.length === 0 && <button onClick={sortearTimes} style={{ padding: "16px", background: "#007bff", color: "white", borderRadius: "8px", border: "none", fontWeight: "bold", fontSize: "18px" }}>🎲 Sortear Times Equilibrados</button>}
                   {teamA.length > 0 && (
                     <>
-                      <button onClick={confirmarSorteio} style={{ width: "100%", padding: "16px", background: "#28a745", color: "white", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: "bold", boxShadow: "0 4px 6px rgba(40,167,69,0.2)" }}>🔒 Confirmar Sorteio e Travar Jogo</button>
-                      <button onClick={sortearTimes} style={{ width: "100%", padding: "10px", background: "#f8f9fa", color: "#6c757d", borderRadius: "8px", border: "1px solid #ced4da", cursor: "pointer", fontSize: "14px", marginTop: "5px" }}>🔄 Não gostei, refazer sorteio</button>
+                      <button onClick={confirmarSorteio} style={{ padding: "16px", background: "#28a745", color: "white", borderRadius: "8px", border: "none", fontWeight: "bold", fontSize: "18px" }}>🔒 Confirmar Sorteio e Travar Jogo</button>
+                      <button onClick={sortearTimes} style={{ padding: "10px", background: "#f8f9fa", color: "#6c757d", borderRadius: "8px", border: "1px solid #ced4da", cursor: "pointer", fontSize: "14px", marginTop: "5px" }}>🔄 Não gostei, refazer sorteio</button>
                     </>
                   )}
                 </div>
               ) : (
                 <div style={{ display: "flex", gap: "12px", flexDirection: "column", background: "#fff", padding: "15px", borderRadius: "10px", border: "1px solid #dee2e6" }}>
-                  <button onClick={salvarEstatisticas} style={{ width: "100%", padding: "16px", background: "#ffc107", color: "#333", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: "bold", boxShadow: "0 4px 6px rgba(255,193,7,0.2)" }}>💾 Salvar Estatísticas</button>
-                  {/* Se todos os placares e gols estiverem zerados, permite reabrir o jogo */}
-                  {(Number(scoreA) === 0 && Number(scoreB) === 0 && (displayQtdTimes === 2 || Number(scoreC) === 0) && Object.values(goals).every((g) => Number(g) === 0) && Object.values(ownGoals).every((g) => Number(g) === 0)) && (
-                    <button onClick={desfazerSorteio} style={{ width: "100%", padding: "14px", background: "#fff", color: "#dc3545", borderRadius: "8px", border: "2px solid #dc3545", cursor: "pointer", fontSize: "16px", fontWeight: "bold", marginTop: "10px" }}>⚠️ Reabrir Jogo (Desfazer Sorteio)</button>
+                  <button onClick={salvarEstatisticas} style={{ padding: "16px", background: "#ffc107", color: "#333", borderRadius: "8px", border: "none", fontWeight: "bold", fontSize: "18px" }}>💾 Salvar Estatísticas</button>
+                  
+                  {/* Se placares, gols, gols contra E assistências estiverem zerados, permite reabrir o jogo */}
+                  {(Number(scoreA) === 0 && Number(scoreB) === 0 && (!isTresTimes || Number(scoreC) === 0) && Object.values(goals).every((g) => Number(g) === 0) && Object.values(ownGoals).every((g) => Number(g) === 0) && Object.values(assists).every((a) => Number(a) === 0)) && (
+                    <button onClick={desfazerSorteio} style={{ padding: "14px", background: "#fff", color: "#dc3545", borderRadius: "8px", border: "2px solid #dc3545", cursor: "pointer", fontSize: "16px", fontWeight: "bold", marginTop: "10px" }}>⚠️ Reabrir Jogo (Desfazer Sorteio)</button>
                   )}
                 </div>
               )}
