@@ -205,7 +205,7 @@ export default function GroupSettingsPage({ user }) {
             <input type="text" value={form.nome_local_jogo_grupo} onChange={(e) => setForm({ ...form, nome_local_jogo_grupo: e.target.value })} style={inputStyle} />
           </div>
 
-          <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+          <div style={{ display: "flex", gap: "10px", width: "95%" }}>
             <div style={{ flex: "2 1 0", textAlign: "left", minWidth: 0 }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana</label>
               <select value={form.dia_jogo_grupo} onChange={(e) => setForm({ ...form, dia_jogo_grupo: e.target.value })} style={inputStyle}>
