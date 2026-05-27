@@ -205,8 +205,8 @@ export default function GroupSettingsPage({ user }) {
             <input type="text" value={form.nome_local_jogo_grupo} onChange={(e) => setForm({ ...form, nome_local_jogo_grupo: e.target.value })} style={inputStyle} />
           </div>
 
-          <div style={{ display: "flex", gap: "10px", width: "95%" }}>
-            <div style={{ flex: "2 1 0", textAlign: "left", minWidth: 0 }}>
+          <div style={{ display: "flex", gap: "5px", width: "90%" }}>
+            <div style={{ flex: "3 1 0", textAlign: "left", minWidth: 0 }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana</label>
               <select value={form.dia_jogo_grupo} onChange={(e) => setForm({ ...form, dia_jogo_grupo: e.target.value })} style={inputStyle}>
                 <option value="Domingo">Domingo</option>
@@ -219,8 +219,8 @@ export default function GroupSettingsPage({ user }) {
               </select>
             </div>
 
-            <div style={{ flex: "1 1 0", textAlign: "left", minWidth: 0, marginRight: "5px"}}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Hora</label>
+            <div style={{ flex: "2 1 0", textAlign: "left", minWidth: 0, marginRight: "10px"}}>
+              <label style={{ fontSize: "12px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Hora</label>
               <input type="time" className="time-input-dark-icon" value={form.hora_jogo_grupo} onChange={(e) => setForm({ ...form, hora_jogo_grupo: e.target.value })} style={inputStyle} />
             </div>
           </div>
