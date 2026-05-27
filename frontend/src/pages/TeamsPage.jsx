@@ -629,12 +629,34 @@ export default function TeamsPage({ user }) {
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", paddingBottom: "40px" }}>
       
-      <div style={{ overflowX: "auto", gap: "10px", marginBottom: "20px", paddingBottom: "10px" }}>
-        {matches.map((m) => (
-          <button key={m.id} onClick={() => loadMatchData(m)} style={{  marginBottom: "5px", marginInline: "3px", padding: "12px", borderRadius: "15px", cursor: "pointer", border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd", background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff", color: "#333", fontWeight: selectedMatch?.id === m.id ? "bold" : "normal", whiteSpace: "nowrap" }}>
-            {m.date.split("-").reverse().join("/")} {m.is_drawn && "🔒"}
-          </button>
-        ))}
+      {/* NOVO SELETOR DE PARTIDA */}
+      <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
+          📅 Selecione a Partida
+        </label>
+        <select 
+          value={selectedMatch?.id || ""} 
+          onChange={(e) => {
+            const matchId = e.target.value;
+            if (!matchId) {
+              setSelectedMatch(null);
+              setTeamA([]); setTeamB([]); setTeamC([]);
+              setScoreA(0); setScoreB(0); setScoreC(0);
+              setConfirmedList([]);
+            } else {
+              const match = matches.find(m => String(m.id) === String(matchId));
+              if (match) loadMatchData(match);
+            }
+          }} 
+          style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "15px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
+        >
+          <option value="">Selecione a data...</option>
+          {matches.map(m => (
+            <option key={m.id} value={m.id}>
+              {m.date.split("-").reverse().join("/")} {m.is_drawn ? "🔒 (Fechada)" : "🎲 (Aberto)"}
+            </option>
+          ))}
+        </select>
       </div>
 
       {selectedMatch && (

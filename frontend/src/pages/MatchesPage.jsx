@@ -401,16 +401,39 @@ export default function MatchesPage({ user }) {
         </div>
       )}
 
-      <div style={{ maxWidth: "600px", gap: "10px", overflowX: "auto", paddingBottom: "10px", marginBottom: "20px" }}>
-        {matches.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => selectMatch(m)}
-            style={{ marginBottom: "5px", marginInline: "3px", padding: "12px", borderRadius: "15px", cursor: "pointer", border: selectedMatch?.id === m.id ? "2px solid #007bff" : "1px solid #ddd", background: selectedMatch?.id === m.id ? "#e7f1ff" : "#fff", color: selectedMatch?.id === m.id ? "#007bff" : "#555", fontWeight: selectedMatch?.id === m.id ? "bold" : "normal" }}
+      {/* NOVO SELETOR DE PARTIDA */}
+      <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
+          📅 Selecione a Partida
+        </label>
+        {matches.length === 0 ? (
+          <div style={{ padding: "10px", color: "#888", fontSize: "14px", fontStyle: "italic" }}>
+            Nenhuma partida criada ainda. {isAdmin && "Clique em '+ Novo Jogo' para começar."}
+          </div>
+        ) : (
+          <select 
+            value={selectedMatch?.id || ""} 
+            onChange={(e) => {
+              const matchId = e.target.value;
+              if (!matchId) {
+                setSelectedMatch(null);
+                setStatusMap({});
+                setShirtMap({});
+              } else {
+                const match = matches.find(m => String(m.id) === String(matchId));
+                if (match) selectMatch(match);
+              }
+            }} 
+            style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "15px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
           >
-            {m.date.split("-").reverse().join("/")} {m.is_drawn && "🔒"}
-          </button>
-        ))}
+            <option value="">Selecione a data...</option>
+            {matches.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.date.split("-").reverse().join("/")} {m.is_drawn ? "🔒 (Fechada)" : "🎲 (Aberto)"}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {selectedMatch && (

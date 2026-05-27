@@ -23,7 +23,6 @@ export default function BallVotePage({ user }) {
   
   // Máquina de estado para controlar as fases da votação
   const [votingPhase, setVotingPhase] = useState("WAITING"); // WAITING | T1 | INTERVAL | T2 | CLOSED
-
   const [loadingVote, setLoadingVote] = useState(false);
 
   const [currentRound, setCurrentRound] = useState(1);
@@ -113,13 +112,11 @@ export default function BallVotePage({ user }) {
       setBolaCheiaId(data.bola_cheia_player_id);
       setBolaMurchaId(data.bola_murcha_player_id);
     } else {
-      // === CORREÇÃO: Limpa as seleções se não houver voto registrado para este turno ===
       setBolaCheiaId(null);
       setBolaMurchaId(null);
     }
   };
 
-  // === CORREÇÃO: Adicionamos o currentRound aqui para forçar a atualização exata no instante que o turno vira ===
   useEffect(() => {
     if (selectedMatchId && user?.player_id) {
       loadExistingVote(selectedMatchId, currentRound);
@@ -149,7 +146,7 @@ export default function BallVotePage({ user }) {
       const matchStart = new Date(ano, mes - 1, dia, hora, minuto, segundo || 0);
       
       if (isNaN(matchStart.getTime())) {
-         setTimeLeft("⏳ Erro de leitura de data no seu celular.");
+         setTimeLeft("⏳ Erro de leitura de data no celular.");
          setIsVotingOpen(false);
          setVotingPhase("WAITING");
          return;
@@ -292,10 +289,7 @@ export default function BallVotePage({ user }) {
     const sortedPlayers = [...players].sort((a, b) => {
       const teamA = a.team || "Z"; 
       const teamB = b.team || "Z";
-
-      if (teamA !== teamB) {
-        return teamA.localeCompare(teamB);
-      }
+      if (teamA !== teamB) return teamA.localeCompare(teamB);
       return a.name.localeCompare(b.name);
     });
 
@@ -417,6 +411,10 @@ export default function BallVotePage({ user }) {
     const votesT1 = allVotes.filter(v => v.round === 1);
     const votesT2 = allVotes.filter(v => v.round === 2);
 
+    // No 1º turno sempre mostra ambos. No 2º turno, só mostra a categoria que teve desempate.
+    const showCheia = round === 1 || runoffCandidates.cheia.length > 1;
+    const showMurcha = round === 1 || runoffCandidates.murcha.length > 1;
+
     let vencedoresC = [];
     let vencedoresM = [];
     let rankingCheia = [];
@@ -441,13 +439,8 @@ export default function BallVotePage({ user }) {
         });
     };
 
-    if (round === 1) {
-      rankingCheia = processRanking('C', votesT1);
-      rankingMurcha = processRanking('M', votesT1);
-    } else {
-      rankingCheia = runoffCandidates.cheia.length > 1 ? processRanking('C', votesT2) : processRanking('C', votesT1);
-      rankingMurcha = runoffCandidates.murcha.length > 1 ? processRanking('M', votesT2) : processRanking('M', votesT1);
-    }
+    if (showCheia) rankingCheia = processRanking('C', round === 2 ? votesT2 : votesT1);
+    if (showMurcha) rankingMurcha = processRanking('M', round === 2 ? votesT2 : votesT1);
 
     const getWinners = (ranking) => {
       if (ranking.length === 0) return [];
@@ -458,50 +451,63 @@ export default function BallVotePage({ user }) {
     vencedoresC = getWinners(rankingCheia);
     vencedoresM = getWinners(rankingMurcha);
 
+    // Ajusta o Grid baseado em quantas categorias serão exibidas (1fr 1fr ou apenas 1fr)
+    const gridColumns = (showCheia && showMurcha) ? "1fr 1fr" : "1fr";
+
     return (
       <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", border: "1px solid #e0e0e0", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", marginBottom: "20px" }}>
         <h3 style={{ margin: "0 0 20px 0", textAlign: "center", color: "#333", borderBottom: "2px solid #f0f0f0", paddingBottom: "10px" }}>{title}</h3>
 
-        {rankingCheia.length === 0 && rankingMurcha.length === 0 ? (
+        {(!showCheia || rankingCheia.length === 0) && (!showMurcha || rankingMurcha.length === 0) ? (
           <div style={{ background: "#f8f9fa", border: "1px solid #e9ecef", borderRadius: "10px", padding: "12px", textAlign: "center", color: "#777", fontSize: "14px" }}>
             Nenhum voto registrado.
           </div>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "25px" }}>
-              <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #c3e6cb" }}>
-                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#2f9e44", textTransform: "uppercase" }}>⚽ CHEIA</div>
-                {vencedoresC.map(v => (
-                  <div key={v.id} style={{ fontSize: "16px", fontWeight: "800", color: "#1b5e20", marginTop: "5px" }}>{v.name}</div>
-                ))}
-              </div>
+            {/* GRID DOS VENCEDORES */}
+            <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: "15px", marginBottom: "25px" }}>
+              {showCheia && (
+                <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #c3e6cb" }}>
+                  <div style={{ fontSize: "10px", fontWeight: "bold", color: "#2f9e44", textTransform: "uppercase" }}>⚽ CHEIA</div>
+                  {vencedoresC.map(v => (
+                    <div key={v.id} style={{ fontSize: "16px", fontWeight: "800", color: "#1b5e20", marginTop: "5px" }}>{v.name}</div>
+                  ))}
+                </div>
+              )}
 
-              <div style={{ background: "#fff5f5", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #f5c6cb" }}>
-                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#e03131", textTransform: "uppercase" }}>🎈 MURCHA</div>
-                {vencedoresM.map(v => (
-                  <div key={v.id} style={{ fontSize: "16px", fontWeight: "800", color: "#c92a2a", marginTop: "5px" }}>{v.name}</div>
-                ))}
-              </div>
+              {showMurcha && (
+                <div style={{ background: "#fff5f5", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #f5c6cb" }}>
+                  <div style={{ fontSize: "10px", fontWeight: "bold", color: "#e03131", textTransform: "uppercase" }}>🎈 MURCHA</div>
+                  {vencedoresM.map(v => (
+                    <div key={v.id} style={{ fontSize: "16px", fontWeight: "800", color: "#c92a2a", marginTop: "5px" }}>{v.name}</div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-              <div>
-                <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
-                {rankingCheia.map(r => (
-                  <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
-                    <strong>{r.name}</strong> <strong>({r.total})</strong>
-                  </div>
-                ))}
-              </div>
+            {/* GRID DOS VOTADOS (HISTÓRICO) */}
+            <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: "20px" }}>
+              {showCheia && (
+                <div>
+                  <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
+                  {rankingCheia.map(r => (
+                    <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
+                      <strong>{r.name}</strong> <strong>({r.total})</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              <div>
-                <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
-                {rankingMurcha.map(r => (
-                  <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
-                    <strong>{r.name}</strong> <strong>({r.total})</strong>
-                  </div>
-                ))}
-              </div>
+              {showMurcha && (
+                <div>
+                  <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
+                  {rankingMurcha.map(r => (
+                    <div key={r.id} style={{ fontSize: "10px", padding: "4px 0", borderBottom: "1px solid #f5f5f5", color: "#444" }}>
+                      <strong>{r.name}</strong> <strong>({r.total})</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -509,15 +515,77 @@ export default function BallVotePage({ user }) {
     );
   };
 
+  // === NOVO: CARD DOS ELEITOS (PÓDIO FINAL) ===
+  const renderFinalWinnersCard = () => {
+    const getWinners = (type, targetRound) => {
+      const votes = allVotes.filter(v => v.round === targetRound);
+      const map = {};
+      votes.forEach(v => {
+        const id = type === 'C' ? v.bola_cheia_player_id : v.bola_murcha_player_id;
+        if (id) map[id] = (map[id] || 0) + 1;
+      });
+      const ranking = Object.entries(map)
+        .map(([id, total]) => {
+          const p = players.find(player => player.id === Number(id));
+          return p ? { ...p, total } : null;
+        })
+        .filter(Boolean);
+      if (ranking.length === 0) return [];
+      const max = Math.max(...ranking.map(r => r.total));
+      return ranking.filter(r => r.total === max);
+    };
+
+    const finalCheia = runoffCandidates.cheia.length > 1 ? getWinners('C', 2) : getWinners('C', 1);
+    const finalMurcha = runoffCandidates.murcha.length > 1 ? getWinners('M', 2) : getWinners('M', 1);
+
+    if (finalCheia.length === 0 && finalMurcha.length === 0) return null;
+
+    return (
+      <div style={{ background: "linear-gradient(135deg, #ffd700 0%, #ffb300 100%)", borderRadius: "16px", padding: "4px", boxShadow: "0 6px 15px rgba(255, 215, 0, 0.2)", marginBottom: "5px" }}>
+        <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", textAlign: "center" }}>
+          <h2 style={{ margin: "0 0 20px 0", color: "#333", fontSize: "20px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
+            🏆 Eleitos da Rodada 🏆
+          </h2>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+            <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", border: "2px solid #51cf66", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: "900", color: "#2b8a3e", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>⚽ Bola Cheia</div>
+              {finalCheia.length > 0 ? finalCheia.map(v => (
+                <div key={v.id} style={{ fontSize: "18px", fontWeight: "900", color: "#1b5e20", lineHeight: "1.2" }}>{v.name}</div>
+              )) : <div style={{color: "#888", fontSize: "14px"}}>Sem votos</div>}
+            </div>
+
+            <div style={{ background: "#fff5f5", padding: "15px", borderRadius: "12px", border: "2px solid #ff8787", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <div style={{ fontSize: "11px", fontWeight: "900", color: "#c92a2a", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>🎈 Bola Murcha</div>
+              {finalMurcha.length > 0 ? finalMurcha.map(v => (
+                <div key={v.id} style={{ fontSize: "18px", fontWeight: "900", color: "#c92a2a", lineHeight: "1.2" }}>{v.name}</div>
+              )) : <div style={{color: "#888", fontSize: "14px"}}>Sem votos</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px" }}>
-      <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px" }}>
+      <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
+          📅 Selecione a Partida
+        </label>
+        
         <select value={selectedMatchId} onChange={(e) => {
           setSelectedMatchId(e.target.value);
           loadConfirmedPlayers(e.target.value);
-        }} style={{ width: "100%", padding: "10px", borderRadius: "8px" }}>
+          }} 
+          style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "15px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
+        >
           <option value="">Selecione a data...</option>
-          {matches.map(m => <option key={m.id} value={m.id}>{m.date.split("-").reverse().join("/")}</option>)}
+          {matches.map(m => (
+            <option key={m.id} value={m.id}>
+              {m.date.split("-").reverse().join("/")} {m.is_drawn ? "🔒 (Fechada)" : "🎲 (Aberto)"}
+            </option>
+          ))}
         </select>
         <div style={{ marginTop: "10px", fontWeight: "bold", color: "#007bff" }}>{timeLeft}</div>
       </div>
@@ -525,6 +593,9 @@ export default function BallVotePage({ user }) {
       {selectedMatchId && votingPhase !== "WAITING" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
           
+          {/* Aparece APENAS quando toda a votação acaba (Máquina de Estado no CLOSED) */}
+          {votingPhase === "CLOSED" && renderFinalWinnersCard()}
+
           <section>
             {votingPhase === "T1" 
               ? renderVotingArea(1) 
@@ -536,7 +607,7 @@ export default function BallVotePage({ user }) {
               <hr style={{ border: "none", borderTop: "1px dashed #ccc", margin: "10px 0 25px 0" }} />
               {votingPhase === "T2" 
                 ? renderVotingArea(2) 
-                : renderSummaryArea(2, "🏁 Resultado Final - Desempate")}
+                : renderSummaryArea(2, "🏁 Resultado Final do Desempate")}
             </section>
           )}
 
