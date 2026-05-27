@@ -205,7 +205,7 @@ export default function GroupSettingsPage({ user }) {
             <input type="text" value={form.nome_local_jogo_grupo} onChange={(e) => setForm({ ...form, nome_local_jogo_grupo: e.target.value })} style={inputStyle} />
           </div>
 
-          <div style={{ display: "flex", gap: "15px", width: "100%" }}>
+          <div style={{ display: "flex", gap: "10px", width: "100%" }}>
             <div style={{ flex: "2 1 0", textAlign: "left", minWidth: 0 }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana</label>
               <select value={form.dia_jogo_grupo} onChange={(e) => setForm({ ...form, dia_jogo_grupo: e.target.value })} style={inputStyle}>
@@ -219,7 +219,7 @@ export default function GroupSettingsPage({ user }) {
               </select>
             </div>
 
-            <div style={{ flex: "1 1 0", textAlign: "left", minWidth: 0 }}>
+            <div style={{ flex: "1 1 0", textAlign: "left", minWidth: 0, marginRight: "5px"}}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Hora</label>
               <input type="time" className="time-input-dark-icon" value={form.hora_jogo_grupo} onChange={(e) => setForm({ ...form, hora_jogo_grupo: e.target.value })} style={inputStyle} />
             </div>
@@ -241,8 +241,8 @@ export default function GroupSettingsPage({ user }) {
              
              <div style={{ display: "flex", gap: "15px" }}>
                <div style={{ flex: "1" }}>
-                 <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "flex", alignItems: "center", marginBottom: "5px" }}>
-                   Qtd. de Times
+                 <label style={{ fontSize: "11px", fontWeight: "bold", color: "#555", display: "flex", alignItems: "center", marginBottom: "5px" }}>
+                   Qtd. Times
                    <span className="help-icon" onClick={showHelpTimes} title="Exibir ajuda">?</span>
                  </label>
                  <select 
@@ -256,7 +256,7 @@ export default function GroupSettingsPage({ user }) {
                </div>
                
                <div style={{ flex: "1" }}>
-                 <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "flex", alignItems: "center", marginBottom: "5px" }}>
+                 <label style={{ fontSize: "11px", fontWeight: "bold", color: "#555", display: "flex", alignItems: "center", marginBottom: "5px" }}>
                    Min. Jogadores
                    <span className="help-icon" onClick={showHelpJogadores} title="Exibir ajuda">?</span>
                  </label>
