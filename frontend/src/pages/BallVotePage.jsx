@@ -20,13 +20,17 @@ export default function BallVotePage({ user }) {
   const [existingVote, setExistingVote] = useState(null);
   const [timeLeft, setTimeLeft] = useState("");
   const [isVotingOpen, setIsVotingOpen] = useState(false);
+  
+  // Máquina de estado para controlar as fases da votação
+  const [votingPhase, setVotingPhase] = useState("WAITING"); // WAITING | T1 | INTERVAL | T2 | CLOSED
+
   const [loadingVote, setLoadingVote] = useState(false);
 
   const [currentRound, setCurrentRound] = useState(1);
   const [runoffCandidates, setRunoffCandidates] = useState({ cheia: [], murcha: [] });
   const [allVotes, setAllVotes] = useState([]);
 
-  const { activeGroup, isAdmin } = useGroup();
+  const { activeGroup } = useGroup();
 
   useEffect(() => {
     if (activeGroup) {
@@ -37,6 +41,7 @@ export default function BallVotePage({ user }) {
       setExistingVote(null);
       setRunoffCandidates({ cheia: [], murcha: [] });
       setCurrentRound(1);
+      setVotingPhase("WAITING");
     }
   }, [activeGroup]);
 
@@ -103,17 +108,23 @@ export default function BallVotePage({ user }) {
       .maybeSingle();
     
     setExistingVote(data || null);
+    
     if (data) {
       setBolaCheiaId(data.bola_cheia_player_id);
       setBolaMurchaId(data.bola_murcha_player_id);
+    } else {
+      // === CORREÇÃO: Limpa as seleções se não houver voto registrado para este turno ===
+      setBolaCheiaId(null);
+      setBolaMurchaId(null);
     }
   };
 
+  // === CORREÇÃO: Adicionamos o currentRound aqui para forçar a atualização exata no instante que o turno vira ===
   useEffect(() => {
     if (selectedMatchId && user?.player_id) {
       loadExistingVote(selectedMatchId, currentRound);
     }
-  }, [selectedMatchId, user?.player_id]); 
+  }, [selectedMatchId, user?.player_id, currentRound]); 
 
   useEffect(() => {
     if (!selectedMatchId || matches.length === 0) return;
@@ -126,13 +137,12 @@ export default function BallVotePage({ user }) {
       if (!isLatestMatch) {
         setTimeLeft("Votação encerrada (Partida Anterior).");
         setIsVotingOpen(false);
+        setVotingPhase("CLOSED");
         return; 
       }
 
       const now = new Date();
-      
-      const horaCrua = activeGroup?.hora_jogo_grupo || "21:00:00"; 
-      
+      const horaCrua = activeGroup?.hora_jogo_grupo || "22:30:00"; 
       const [ano, mes, dia] = match.date.split("-").map(Number);
       const [hora, minuto, segundo] = horaCrua.split(":").map(Number);
       
@@ -141,11 +151,11 @@ export default function BallVotePage({ user }) {
       if (isNaN(matchStart.getTime())) {
          setTimeLeft("⏳ Erro de leitura de data no seu celular.");
          setIsVotingOpen(false);
+         setVotingPhase("WAITING");
          return;
       }
       
       const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000); 
-      
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);
       const t2Start = new Date(t1End.getTime() + INTERVALO);
       const t2End = new Date(t2Start.getTime() + DURACAO_T2);
@@ -153,21 +163,25 @@ export default function BallVotePage({ user }) {
       if (!match.is_drawn) {
         setTimeLeft("Aguardando fechamento da partida...");
         setIsVotingOpen(false);
+        setVotingPhase("WAITING");
       } else if (now < t1Start) {
         const horaAbertura = t1Start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         setTimeLeft(`Aguarde, início da votação às ${horaAbertura}!`);
         setIsVotingOpen(false);
+        setVotingPhase("WAITING");
       } else if (now <= t1End) {
         if (currentRound !== 1) {
           setCurrentRound(1);
           setExistingVote(null);
-          loadExistingVote(match.id, 1);
+          loadMatchVotes(match.id); 
         }
         setTimeLeft(`1º Turno: ${formatTime(t1End - now)}`);
         setIsVotingOpen(true);
+        setVotingPhase("T1");
       } else if (now < t2Start) {
         setTimeLeft("Apurando empates... 2º Turno em breve.");
         setIsVotingOpen(false);
+        setVotingPhase("INTERVAL");
       } else if (now <= t2End) {
         const hasEmpate = runoffCandidates.cheia.length > 1 || runoffCandidates.murcha.length > 1;
         
@@ -175,19 +189,20 @@ export default function BallVotePage({ user }) {
           if (currentRound !== 2) {
             setCurrentRound(2);
             setExistingVote(null);
-            setBolaCheiaId(null);
-            setBolaMurchaId(null);          
-            loadExistingVote(match.id, 2);
+            loadMatchVotes(match.id); 
           }
           setTimeLeft(`2º TURNO (Desempate): ${formatTime(t2End - now)}`);
           setIsVotingOpen(true);
+          setVotingPhase("T2");
         } else {
           setTimeLeft("Votação encerrada (Sem empates).");
           setIsVotingOpen(false);
+          setVotingPhase("CLOSED");
         }
       } else {
         setTimeLeft("Votação encerrada.");
         setIsVotingOpen(false);
+        setVotingPhase("CLOSED");
       }
     };
 
@@ -198,24 +213,29 @@ export default function BallVotePage({ user }) {
 
   const getRunoffCandidates = (votesT1) => {
     const counts = votesT1.reduce((acc, v) => {
-      acc.c[v.bola_cheia_player_id] = (acc.c[v.bola_cheia_player_id] || 0) + 1;
-      acc.m[v.bola_murcha_player_id] = (acc.m[v.bola_murcha_player_id] || 0) + 1;
+      if (v.bola_cheia_player_id) acc.c[v.bola_cheia_player_id] = (acc.c[v.bola_cheia_player_id] || 0) + 1;
+      if (v.bola_murcha_player_id) acc.m[v.bola_murcha_player_id] = (acc.m[v.bola_murcha_player_id] || 0) + 1;
       return acc;
     }, { c: {}, m: {} });
 
     const calc = (obj) => {
       const max = Math.max(...Object.values(obj), 0);
-      return max > 0 ? Object.keys(obj).filter(k => obj[k] === max).map(Number) : [];
+      const tied = max > 0 ? Object.keys(obj).filter(k => obj[k] === max).map(Number) : [];
+      return tied.length > 1 ? tied : []; 
     };
     return { cheia: calc(counts.c), murcha: calc(counts.m) };
   };
 
   const handleSaveVote = async () => {
     if (loadingVote) return; 
-    if (!bolaCheiaId || !bolaMurchaId) return alert("Selecione os dois!");
-    if (bolaCheiaId === bolaMurchaId) return alert("Não pode ser a mesma pessoa!");
+
+    const needsCheia = currentRound === 1 || runoffCandidates.cheia.length > 1;
+    const needsMurcha = currentRound === 1 || runoffCandidates.murcha.length > 1;
+
+    if (needsCheia && !bolaCheiaId) return alert("Selecione o Bola Cheia!");
+    if (needsMurcha && !bolaMurchaId) return alert("Selecione o Bola Murcha!");
+    if (needsCheia && needsMurcha && bolaCheiaId === bolaMurchaId) return alert("Não pode ser a mesma pessoa!");
     
-    const roundParaGravar = currentRound; 
     setLoadingVote(true);
 
     const { data, error } = await supabase
@@ -224,9 +244,9 @@ export default function BallVotePage({ user }) {
         id_grupo: activeGroup.id_grupo, 
         match_id: selectedMatchId,
         voter_player_id: user.player_id,
-        bola_cheia_player_id: bolaCheiaId,
-        bola_murcha_player_id: bolaMurchaId,
-        round: roundParaGravar
+        bola_cheia_player_id: needsCheia ? bolaCheiaId : null,
+        bola_murcha_player_id: needsMurcha ? bolaMurchaId : null,
+        round: currentRound
       }])
       .select()
       .single();
@@ -264,7 +284,11 @@ export default function BallVotePage({ user }) {
 
     const selectedMatch = matches.find(m => String(m.id) === String(selectedMatchId));
 
-    // Ordenação: Time A -> Time B -> Time C -> Sem Time (Ordem Alfabética em cada grupo)
+    const needsCheia = round === 1 || runoffCandidates.cheia.length > 1;
+    const needsMurcha = round === 1 || runoffCandidates.murcha.length > 1;
+
+    const canSubmit = canVote && (!needsCheia || bolaCheiaId) && (!needsMurcha || bolaMurchaId) && !loadingVote;
+
     const sortedPlayers = [...players].sort((a, b) => {
       const teamA = a.team || "Z"; 
       const teamB = b.team || "Z";
@@ -300,11 +324,11 @@ export default function BallVotePage({ user }) {
             {sortedPlayers.map((p, index) => {
               const canCheia = round === 1 || runoffCandidates.cheia.includes(p.id);
               const canMurcha = round === 1 || runoffCandidates.murcha.includes(p.id);
+              
               if (!canCheia && !canMurcha) return null;
 
               const disableClick = !canVote || p.id === user?.player_id;
 
-              // Identifica os dados de cor e nome de TODOS os times (A, B e C)
               const teamName = p.team === "A" ? (selectedMatch?.team_a_name || "Time A") : 
                                p.team === "B" ? (selectedMatch?.team_b_name || "Time B") : 
                                p.team === "C" ? (selectedMatch?.team_c_name || "Time C") : "";
@@ -313,7 +337,6 @@ export default function BallVotePage({ user }) {
                                 p.team === "B" ? (selectedMatch?.team_b_color || "#333") : 
                                 p.team === "C" ? (selectedMatch?.team_c_color || "#333") : "transparent";
 
-              // Identifica se estamos desenhando o primeiro jogador de um novo time para colocar margem
               const isFirstOfNewTeam = index > 0 && p.team && sortedPlayers[index - 1].team !== p.team;
 
               return (
@@ -368,18 +391,18 @@ export default function BallVotePage({ user }) {
             
             <button 
               onClick={handleSaveVote} 
-              disabled={!canVote || !bolaCheiaId || !bolaMurchaId || loadingVote}
+              disabled={!canSubmit}
               style={{ 
                 width: "100%",
                 marginTop: "10px", 
                 padding: "14px", 
                 borderRadius: "8px", 
                 border: "none", 
-                background: (canVote && bolaCheiaId && bolaMurchaId && !loadingVote) ? "#007bff" : "#ced4da", 
-                color: (canVote && bolaCheiaId && bolaMurchaId && !loadingVote) ? "white" : "#6c757d", 
+                background: canSubmit ? "#007bff" : "#ced4da", 
+                color: canSubmit ? "white" : "#6c757d", 
                 fontWeight: "bold", 
                 fontSize: "15px",
-                cursor: (canVote && bolaCheiaId && bolaMurchaId && !loadingVote) ? "pointer" : "not-allowed" 
+                cursor: canSubmit ? "pointer" : "not-allowed" 
               }}
             >
               {loadingVote ? "Gravando..." : "💾 Confirmar Voto"}
@@ -391,61 +414,60 @@ export default function BallVotePage({ user }) {
   };
 
   const renderSummaryArea = (round, title) => {
-    const votes = allVotes.filter(v => v.round === round);
-    const totalVotes = votes.length;
+    const votesT1 = allVotes.filter(v => v.round === 1);
+    const votesT2 = allVotes.filter(v => v.round === 2);
 
     let vencedoresC = [];
     let vencedoresM = [];
     let rankingCheia = [];
     let rankingMurcha = [];
 
-    if (totalVotes > 0) {
-      const processRanking = (type) => {
-        const map = {};
-        votes.forEach(v => {
-          const id = type === 'C' ? v.bola_cheia_player_id : v.bola_murcha_player_id;
-          map[id] = (map[id] || 0) + 1;
+    const processRanking = (type, votesToUse) => {
+      const map = {};
+      votesToUse.forEach(v => {
+        const id = type === 'C' ? v.bola_cheia_player_id : v.bola_murcha_player_id;
+        if (id) map[id] = (map[id] || 0) + 1;
+      });
+
+      return Object.entries(map)
+        .map(([id, total]) => {
+          const p = players.find(player => player.id === Number(id));
+          return p ? { ...p, total } : null;
+        })
+        .filter(Boolean) 
+        .sort((a, b) => {
+          if (round === 2 && isVotingOpen) return a.name.localeCompare(b.name); 
+          return b.total - a.total || a.name.localeCompare(b.name); 
         });
+    };
 
-        return Object.entries(map)
-          .map(([id, total]) => {
-            const p = players.find(player => player.id === Number(id));
-            return { ...p, total };
-          })
-          .filter(p => p && p.name) 
-          .sort((a, b) => {
-            if (round === 2 && isVotingOpen) return a.name.localeCompare(b.name); 
-            return b.total - a.total || a.name.localeCompare(b.name); 
-          });
-      };
-
-      rankingCheia = processRanking('C');
-      rankingMurcha = processRanking('M');
-
-      const getWinners = (ranking) => {
-        if (ranking.length === 0) return [];
-        const max = Math.max(...ranking.map(r => r.total));
-        return ranking.filter(r => r.total === max);
-      };
-
-      vencedoresC = getWinners(rankingCheia);
-      vencedoresM = getWinners(rankingMurcha);
+    if (round === 1) {
+      rankingCheia = processRanking('C', votesT1);
+      rankingMurcha = processRanking('M', votesT1);
+    } else {
+      rankingCheia = runoffCandidates.cheia.length > 1 ? processRanking('C', votesT2) : processRanking('C', votesT1);
+      rankingMurcha = runoffCandidates.murcha.length > 1 ? processRanking('M', votesT2) : processRanking('M', votesT1);
     }
+
+    const getWinners = (ranking) => {
+      if (ranking.length === 0) return [];
+      const max = Math.max(...ranking.map(r => r.total));
+      return ranking.filter(r => r.total === max);
+    };
+
+    vencedoresC = getWinners(rankingCheia);
+    vencedoresM = getWinners(rankingMurcha);
 
     return (
       <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", border: "1px solid #e0e0e0", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", marginBottom: "20px" }}>
         <h3 style={{ margin: "0 0 20px 0", textAlign: "center", color: "#333", borderBottom: "2px solid #f0f0f0", paddingBottom: "10px" }}>{title}</h3>
 
-        {totalVotes === 0 ? (
+        {rankingCheia.length === 0 && rankingMurcha.length === 0 ? (
           <div style={{ background: "#f8f9fa", border: "1px solid #e9ecef", borderRadius: "10px", padding: "12px", textAlign: "center", color: "#777", fontSize: "14px" }}>
-            Nenhum voto registrado para este turno.
+            Nenhum voto registrado.
           </div>
         ) : (
           <>
-            <div style={{ background: "#f8f9fa", border: "1px solid #e9ecef", borderRadius: "10px", padding: "10px 12px", marginBottom: "20px", fontSize: "14px", color: "#444", textAlign: "center" }}>
-              Total de votos registrados: <strong>{totalVotes}</strong>
-            </div>
-
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "25px" }}>
               <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #c3e6cb" }}>
                 <div style={{ fontSize: "10px", fontWeight: "bold", color: "#2f9e44", textTransform: "uppercase" }}>⚽ CHEIA</div>
@@ -500,19 +522,19 @@ export default function BallVotePage({ user }) {
         <div style={{ marginTop: "10px", fontWeight: "bold", color: "#007bff" }}>{timeLeft}</div>
       </div>
 
-      {selectedMatchId && (
+      {selectedMatchId && votingPhase !== "WAITING" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
           
           <section>
-            {currentRound === 1 && isVotingOpen 
+            {votingPhase === "T1" 
               ? renderVotingArea(1) 
               : renderSummaryArea(1, "📊 Resultado 1º Turno")}
           </section>
 
-          {(runoffCandidates.cheia.length > 1 || runoffCandidates.murcha.length > 1) && (
+          {(runoffCandidates.cheia.length > 1 || runoffCandidates.murcha.length > 1) && (votingPhase === "T2" || votingPhase === "CLOSED") && (
             <section>
               <hr style={{ border: "none", borderTop: "1px dashed #ccc", margin: "10px 0 25px 0" }} />
-              {currentRound === 2 && isVotingOpen 
+              {votingPhase === "T2" 
                 ? renderVotingArea(2) 
                 : renderSummaryArea(2, "🏁 Resultado Final - Desempate")}
             </section>
