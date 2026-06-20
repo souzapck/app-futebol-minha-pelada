@@ -3,7 +3,8 @@ import { supabase } from "../supabaseClient";
 import { useGroup } from "../contexts/GroupContext";
 
 export default function GroupSettingsPage({ user }) {
-  const { activeGroup } = useGroup();
+  // === AJUSTE: Trouxemos o changeGroup para atualizar o menu em tempo real ===
+  const { activeGroup, changeGroup } = useGroup();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -18,6 +19,7 @@ export default function GroupSettingsPage({ user }) {
     dia_jogo_grupo: "Quinta-feira",
     hora_jogo_grupo: "22:30",
     nome_local_jogo_grupo: "",
+    url_videos_pelada: "",
     qtd_times: 2,
     min_jogadores_time: 5,
     nome_time_c: "Time C",
@@ -52,6 +54,7 @@ export default function GroupSettingsPage({ user }) {
         dia_jogo_grupo: data.dia_jogo_grupo || "Quinta-feira",
         hora_jogo_grupo: data.hora_jogo_grupo ? data.hora_jogo_grupo.slice(0, 5) : "22:30",
         nome_local_jogo_grupo: data.nome_local_jogo_grupo || "",
+        url_videos_pelada: data.url_videos_pelada || "",
         qtd_times: data.qtd_times || 2,
         min_jogadores_time: data.min_jogadores_time || 5,
         nome_time_c: data.nome_time_c || "Time C",
@@ -106,6 +109,7 @@ export default function GroupSettingsPage({ user }) {
         dia_jogo_grupo: form.dia_jogo_grupo,
         hora_jogo_grupo: form.hora_jogo_grupo,
         nome_local_jogo_grupo: form.nome_local_jogo_grupo,
+        url_videos_pelada: form.url_videos_pelada,
         qtd_times: Number(form.qtd_times),
         min_jogadores_time: Number(form.min_jogadores_time),
         nome_time_c: form.nome_time_c,
@@ -120,6 +124,16 @@ export default function GroupSettingsPage({ user }) {
       alert("❌ Erro ao salvar configurações.");
     } else {
       alert("✅ Configurações salvas com sucesso!");
+      
+      // === AJUSTE: Atualiza o contexto global na mesma hora ===
+      if (changeGroup) {
+        changeGroup({
+          ...activeGroup,
+          nome_grupo: form.nome_grupo,
+          logo_url: form.logo_url,
+          url_videos_pelada: form.url_videos_pelada
+        });
+      }
     }
   };
 
@@ -142,7 +156,6 @@ export default function GroupSettingsPage({ user }) {
 
   const time3Disabled = Number(form.qtd_times) === 2;
 
-  // Popups de ajuda
   const showHelpTimes = () => {
     alert("Qtd. de Times:\n\nDefina se a sua pelada divide os jogadores em 2 times (partida única tradicional) ou em 3 times (formato rei da quadra, onde quem ganha fica).");
   };
@@ -205,6 +218,17 @@ export default function GroupSettingsPage({ user }) {
             <input type="text" value={form.nome_local_jogo_grupo} onChange={(e) => setForm({ ...form, nome_local_jogo_grupo: e.target.value })} style={inputStyle} />
           </div>
 
+          <div style={{ textAlign: "left", width: "100%" }}>
+            <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>URL Vídeos da Pelada</label>
+            <input 
+              type="url" 
+              placeholder="https://..."
+              value={form.url_videos_pelada} 
+              onChange={(e) => setForm({ ...form, url_videos_pelada: e.target.value })} 
+              style={inputStyle} 
+            />
+          </div>
+
           <div style={{ display: "flex", gap: "5px", width: "90%" }}>
             <div style={{ flex: "3 1 0", textAlign: "left", minWidth: 0 }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", display: "block", marginBottom: "5px" }}>Dia da Semana</label>
@@ -235,7 +259,6 @@ export default function GroupSettingsPage({ user }) {
             {uploadingImage && <div style={{ fontSize: "12px", color: "#007bff", marginTop: "8px", fontWeight: "bold" }}>Enviando imagem... ⏳</div>}
           </div>
 
-          {/* === CONFIGURAÇÕES DE SORTEIO (Textos curtos + Help) === */}
           <div style={{ textAlign: "left", background: "#eef2f5", padding: "15px", borderRadius: "8px", border: "1px solid #c2c9d6", width: "100%", boxSizing: "border-box", marginTop: "10px" }}>
              <h4 style={{ margin: "0 0 15px 0", color: "#333", fontSize: "15px", display: "flex", alignItems: "center", gap: "6px" }}>🎲 Configurações do Sorteio</h4>
              
@@ -272,10 +295,8 @@ export default function GroupSettingsPage({ user }) {
              </div>
           </div>
 
-          {/* === CARDS DE TIMES (Um embaixo do outro, Nome e Cor na mesma linha) === */}
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "5px", width: "100%" }}>
             
-            {/* TIME 1 */}
             <div style={{ display: "flex", flexDirection: "column", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", marginBottom: "8px" }}>Time 1 (Interno: A)</label>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -291,7 +312,6 @@ export default function GroupSettingsPage({ user }) {
               </div>
             </div>
 
-            {/* TIME 2 */}
             <div style={{ display: "flex", flexDirection: "column", background: "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box" }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", marginBottom: "8px" }}>Time 2 (Interno: B)</label>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -307,7 +327,6 @@ export default function GroupSettingsPage({ user }) {
               </div>
             </div>
 
-            {/* TIME 3 */}
             <div style={{ display: "flex", flexDirection: "column", background: time3Disabled ? "#eaeaea" : "#f8f9fa", padding: "12px", borderRadius: "8px", border: "1px solid #ddd", boxSizing: "border-box", opacity: time3Disabled ? 0.5 : 1, pointerEvents: time3Disabled ? "none" : "auto", transition: "all 0.3s" }}>
               <label style={{ fontSize: "13px", fontWeight: "bold", color: "#555", marginBottom: "8px" }}>
                 Time 3 (Interno: C) {time3Disabled && <span style={{ fontSize: "10px", color: "#dc3545", marginLeft: "4px" }}>(Desativado)</span>}

@@ -253,60 +253,67 @@ function AppContent() {
     return <div style={{ textAlign: "center", marginTop: "50px", fontFamily: "Arial, sans-serif" }}>Entrando no Vestiário...</div>;
   }
 
-  // === ESTILIZAÇÃO AVANÇADA DOS BOTÕES ===
+  // === ESTILIZAÇÃO AVANÇADA DOS BOTÕES (AGORA COM AS CORES DO TOPO) ===
   const tabButtonStyle = (isActive, isMenu = false) => ({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    // Pílula verde no fundo apenas para o botão ativo
-    background: isActive ? "#e8f5e9" : "transparent",
+    background: isActive ? "#f8f9fa" : "transparent",
     borderRadius: "12px",
     border: "none",
     cursor: "pointer",
     padding: "8px 0",
     margin: "0 2px",
     flex: 1,
-    // Cor de destaque verde se ativo, chumbo se for o Menu, e cinza para os inativos
-    color: isActive ? "#28a745" : (isMenu ? "#444" : "#6c757d"),
+    color: isActive ? "#007bff" : (isMenu ? "#444" : "#6c757d"),
     fontWeight: isActive ? "900" : (isMenu ? "bold" : "normal"),
-    // Esmaece os botões que não estão clicados (exceto o Menu)
     opacity: isActive || isMenu ? 1 : 0.4,
-    // Leve zoom no botão selecionado
     transform: isActive ? "scale(1.05)" : "scale(1)",
     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
   });
 
   const isMenuView = ["settings", "players", "requests", "admin_messages"].includes(view);
 
+  // === VERIFICAÇÃO SE EXISTE LINK DE VÍDEO CONFIGURADO ===
+  const temVideo = activeGroup?.url_videos_pelada && activeGroup.url_videos_pelada.trim() !== "";
+
   return (
-    <div style={{ padding: "20px 20px 100px 20px", maxWidth: "600px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: "85px 20px 100px 20px", maxWidth: "600px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       
-      {/* CABEÇALHO DO APLICATIVO */}
+      {/* CABEÇALHO DO APLICATIVO FIXO NO TOPO */}
       <div
         style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginBottom: "20px", background: "#fff", padding: "10px 15px",
-          borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          background: "#ffffff",
+          borderBottom: "1px solid #eee",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
+          zIndex: 1000,
+          paddingTop: "calc(env(safe-area-inset-top) + 4px)"
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div
-            style={{
-              background: "#007bff", color: "white", width: "35px", height: "35px",
-              borderRadius: "50%", display: "flex", alignItems: "center",
-              justifyContent: "center", fontWeight: "bold", fontSize: "18px", overflow: "hidden"
-            }}
-          >
-            {user?.players?.name?.charAt(0)}
-          </div>
-
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontWeight: "bold", color: "#333", fontSize: "14px" }}>
-              {user?.players?.name}
+        <div style={{ maxWidth: "600px", margin: "0 auto", display: "flex", alignItems: "center", height: "60px", padding: "0 15px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#f8f9fa", padding: "6px 16px", borderRadius: "24px", width: "fit-content", border: "1px solid #f0f0f0" }}>
+            <div
+              style={{
+                background: "#007bff", color: "white", width: "35px", height: "35px",
+                borderRadius: "50%", display: "flex", alignItems: "center",
+                justifyContent: "center", fontWeight: "bold", fontSize: "16px", overflow: "hidden"
+              }}
+            >
+              {user?.players?.name?.charAt(0)}
             </div>
-            <div style={{ fontSize: "11px", color: isAdmin ? "#dc3545" : "#888", fontWeight: isAdmin ? "bold" : "normal" }}>
-              {isAdmin ? "🔑 Administrador" : "⚽ Jogador"} | {activeGroup?.nome_grupo}
+
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontWeight: "bold", color: "#333", fontSize: "14px", lineHeight: "1.2" }}>
+                {user?.players?.name}
+              </div>
+              <div style={{ fontSize: "11px", color: isAdmin ? "#dc3545" : "#888", fontWeight: isAdmin ? "bold" : "normal" }}>
+                {isAdmin ? "🔑 Administrador" : "⚽ Jogador"} | {activeGroup?.nome_grupo}
+              </div>
             </div>
           </div>
         </div>
@@ -332,7 +339,7 @@ function AppContent() {
         {view === "ranking" && <RankingPage />}
       </main>
 
-      {/* === PÍLULA MINIMIZADA (Aparece quando a barra desce) === */}
+      {/* PÍLULA MINIMIZADA */}
       <div
         onClick={() => setIsNavMinimized(false)}
         style={{
@@ -360,7 +367,7 @@ function AppContent() {
         <span style={{ fontSize: "16px" }}>👆</span> Menu
       </div>
 
-      {/* NAVEGAÇÃO FIXA MODERNA NO RODAPÉ */}
+      {/* NAVEGAÇÃO FIXA NO RODAPÉ */}
       <div 
         style={{ 
           position: "fixed", 
@@ -398,13 +405,12 @@ function AppContent() {
             <span style={{ fontSize: "10px", marginTop: "3px" }}>Ranking</span>
           </button>
 
-          {/* ABA DO MENU DE OPÇÕES (ABRE DA PARTE INFERIOR PARA CIMA) */}
           <button onClick={(e) => { e.stopPropagation(); setShowUserMenu(!showUserMenu); renovarSessao(); }} style={tabButtonStyle(isMenuView || showUserMenu, true)}>
             <span style={{ fontSize: "20px" }}>☰</span>
             <span style={{ fontSize: "10px", marginTop: "3px" }}>Menu</span>
           </button>
 
-          {/* COMPONENTE DO MENU FLUTUANTE (POPOVER INVERTIDO) */}
+          {/* MENU FLUTUANTE DE OPÇÕES */}
           {showUserMenu && (
             <div
               onClick={(e) => e.stopPropagation()}
@@ -413,26 +419,36 @@ function AppContent() {
                 borderRadius: "12px", boxShadow: "0 -6px 20px rgba(0,0,0,0.15)", minWidth: "200px", zIndex: 2000, overflow: "hidden", display: "flex", flexDirection: "column"
               }}
             >
-              {/* SEÇÃO EXCLUSIVA DO DONO DO APP (SUPER ADMIN) */}
               {Number(user.player_id) === 1 && (
                 <>
                   <div style={{ padding: "6px 14px", background: "#f8f9fa", fontSize: "10px", fontWeight: "bold", color: "#999", textAlign: "left" }}>SISTEMA</div>
-                  <button onClick={() => handleChangeView("requests")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "requests" ? "#ffb300" : "#333", borderBottom: "1px solid #f5f5f5" }}>📋 Solicitações Geral</button>
-                  <button onClick={() => handleChangeView("admin_messages")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "admin_messages" ? "#ffb300" : "#333", borderBottom: "1px solid #f5f5f5" }}>✉️ Caixa de Suporte</button>
+                  <button onClick={() => handleChangeView("requests")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "requests" ? "#007bff" : "#333", borderBottom: "1px solid #f5f5f5" }}>📋 Solicitações Geral</button>
+                  <button onClick={() => handleChangeView("admin_messages")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "admin_messages" ? "#007bff" : "#333", borderBottom: "1px solid #f5f5f5" }}>✉️ Caixa de Suporte</button>
                 </>
               )}
 
-              {/* SEÇÃO DO ADMINISTRADOR DA PELADA */}
               {isAdmin && (
                 <>
                   <div style={{ padding: "6px 14px", background: "#f8f9fa", fontSize: "10px", fontWeight: "bold", color: "#999", textAlign: "left" }}>GERENCIAR PELADA</div>
-                  <button onClick={() => handleChangeView("settings")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "settings" ? "#28a745" : "#333", borderBottom: "1px solid #f5f5f5" }}>⚙️ Configurações</button>
-                  <button onClick={() => handleChangeView("players")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "players" ? "#28a745" : "#333", borderBottom: "1px solid #f5f5f5" }}>👤 Modificar Jogadores</button>
+                  <button onClick={() => handleChangeView("settings")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "settings" ? "#007bff" : "#333", borderBottom: "1px solid #f5f5f5" }}>⚙️ Configurações</button>
+                  <button onClick={() => handleChangeView("players")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "players" ? "#007bff" : "#333", borderBottom: "1px solid #f5f5f5" }}>👤 Modificar Jogadores</button>
                   <button onClick={() => { setShowUserMenu(false); setSupportModalOpen(true); }} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#ffc107", borderBottom: "1px solid #f5f5f5" }}>📢 Chamar Suporte</button>
                 </>
               )}
 
-              {/* SEÇÃO DE CONTA E SESSÃO GERAL */}
+              {/* === SEÇÃO DE VÍDEOS === */}
+              {temVideo && (
+                <>
+                  <div style={{ padding: "6px 14px", background: "#f8f9fa", fontSize: "10px", fontWeight: "bold", color: "#999", textAlign: "left" }}>VÍDEOS DA PELADA</div>
+                  <button 
+                    onClick={() => { setShowUserMenu(false); window.open(activeGroup.url_videos_pelada, "_blank"); }} 
+                    style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#333", borderBottom: "1px solid #f5f5f5" }}
+                  >
+                    🎥 Ixpia seu lance
+                  </button>
+                </>
+              )}
+
               <div style={{ padding: "6px 14px", background: "#f8f9fa", fontSize: "10px", fontWeight: "bold", color: "#999", textAlign: "left" }}>SUA CONTA</div>
               {(user.user_groups?.length > 1) && (
                 <button onClick={() => { setShowUserMenu(false); clearGroup(); }} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#007bff", borderBottom: "1px solid #f5f5f5" }}>🔄 Trocar de Pelada</button>
@@ -444,7 +460,6 @@ function AppContent() {
         </div>
       </div>
 
-      {/* === MODAL DE SUPORTE === */}
       {supportModalOpen && (
         <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
           <div style={{ width: "100%", maxWidth: "450px", background: "#fff", borderRadius: "12px", padding: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
