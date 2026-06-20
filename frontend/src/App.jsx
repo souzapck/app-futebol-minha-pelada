@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AdminRequestsPage from "./pages/AdminRequestsPage.jsx";
-import AdminMessagesPage from "./pages/AdminMessagesPage.jsx"; // NOVO COMPONENTE
+import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import PlayersPage from "./pages/PlayersPage.jsx";
 import MatchesPage from "./pages/MatchesPage.jsx";
@@ -25,8 +25,9 @@ function AppContent() {
   const [supportMessage, setSupportMessage] = useState("");
   const [sendingSupport, setSendingSupport] = useState(false);
 
-  // === ESTADO PARA O MENU DO SUPER ADMIN ===
-  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  // === ESTADOS PARA A BARRA DE NAVEGAÇÃO MINIMIZADA ===
+  const [isNavMinimized, setIsNavMinimized] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
 
   const { activeGroup, changeGroup, clearGroup, isAdmin } = useGroup();
 
@@ -117,6 +118,26 @@ function AppContent() {
     return () => window.removeEventListener("click", handleClickOutside);
   }, [showUserMenu]);
 
+  // === LÓGICA DE ESCONDER/MOSTRAR MENU AO ROLAR A TELA ===
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setIsNavMinimized(true);
+        setShowUserMenu(false);
+      } 
+      else if (currentScrollY < lastScrollY) {
+        setIsNavMinimized(false);
+      }
+      
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
+
   useEffect(() => {
     if (user && !activeGroup) {
       const grupos = user.user_groups || [];
@@ -157,23 +178,22 @@ function AppContent() {
 
   const handleChangeView = (nextView) => {
     setShowUserMenu(false);
-    setShowAdminMenu(false);
+    setIsNavMinimized(false);
     setView(nextView);
     renovarSessao();
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
   };
 
-// === FUNÇÃO DE ENVIO DE SUPORTE ===
   const handleSendSupport = async (e) => {
     e.preventDefault();
     if (!supportMessage.trim()) return;
 
     setSendingSupport(true);
     try {
-      // 1. Tenta pegar da sessão, se não achar, busca direto do banco de dados na hora!
       let telefone = user?.players?.phone || user?.phone;
       
       if (!telefone) {
@@ -186,7 +206,6 @@ function AppContent() {
         telefone = playerData?.phone || "Sem contato";
       }
 
-      // 2. Grava a mensagem com o telefone garantido
       const { error } = await supabase
         .from("suporte_mensagens")
         .insert([{
@@ -234,15 +253,41 @@ function AppContent() {
     return <div style={{ textAlign: "center", marginTop: "50px", fontFamily: "Arial, sans-serif" }}>Entrando no Vestiário...</div>;
   }
 
+  // === ESTILIZAÇÃO AVANÇADA DOS BOTÕES ===
+  const tabButtonStyle = (isActive, isMenu = false) => ({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    // Pílula verde no fundo apenas para o botão ativo
+    background: isActive ? "#e8f5e9" : "transparent",
+    borderRadius: "12px",
+    border: "none",
+    cursor: "pointer",
+    padding: "8px 0",
+    margin: "0 2px",
+    flex: 1,
+    // Cor de destaque verde se ativo, chumbo se for o Menu, e cinza para os inativos
+    color: isActive ? "#28a745" : (isMenu ? "#444" : "#6c757d"),
+    fontWeight: isActive ? "900" : (isMenu ? "bold" : "normal"),
+    // Esmaece os botões que não estão clicados (exceto o Menu)
+    opacity: isActive || isMenu ? 1 : 0.4,
+    // Leve zoom no botão selecionado
+    transform: isActive ? "scale(1.05)" : "scale(1)",
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+  });
+
+  const isMenuView = ["settings", "players", "requests", "admin_messages"].includes(view);
+
   return (
-    <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: "20px 20px 100px 20px", maxWidth: "600px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       
       {/* CABEÇALHO DO APLICATIVO */}
       <div
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
           marginBottom: "20px", background: "#fff", padding: "10px 15px",
-          borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", position: "relative"
+          borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -256,74 +301,14 @@ function AppContent() {
             {user?.players?.name?.charAt(0)}
           </div>
 
-          <div>
-            <div style={{ fontWeight: "bold", color: "#333" }}>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontWeight: "bold", color: "#333", fontSize: "14px" }}>
               {user?.players?.name}
             </div>
-            <div
-              style={{
-                fontSize: "11px",
-                color: isAdmin ? "#dc3545" : "#888",
-                fontWeight: isAdmin ? "bold" : "normal"
-              }}
-            >
+            <div style={{ fontSize: "11px", color: isAdmin ? "#dc3545" : "#888", fontWeight: isAdmin ? "bold" : "normal" }}>
               {isAdmin ? "🔑 Administrador" : "⚽ Jogador"} | {activeGroup?.nome_grupo}
             </div>
           </div>
-        </div>
-
-        <div style={{ position: "relative" }}>
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowUserMenu((prev) => !prev); renovarSessao(); }}
-            style={{
-              background: "#f8f9fa", color: "#333", border: "1px solid #ddd", borderRadius: "8px",
-              padding: "8px 12px", cursor: "pointer", fontWeight: "bold", fontSize: "14px"
-            }}
-          >
-            ☰ Menu
-          </button>
-
-          {showUserMenu && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute", top: "42px", right: 0, background: "#fff", border: "1px solid #ddd",
-                borderRadius: "10px", boxShadow: "0 6px 18px rgba(0,0,0,0.12)", minWidth: "170px", zIndex: 20, overflow: "hidden"
-              }}
-            >
-              {(user.user_groups?.length > 1) && (
-                <button
-                  onClick={() => { setShowUserMenu(false); clearGroup(); }}
-                  style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#007bff", borderBottom: "1px solid #eee" }}
-                >
-                  🔄 Trocar Pelada
-                </button>
-              )}
-
-              {isAdmin && (
-                <button
-                  onClick={() => { setShowUserMenu(false); setSupportModalOpen(true); }}
-                  style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#ffc107", borderBottom: "1px solid #eee" }}
-                >
-                  📢 Enviar Suporte
-                </button>
-              )}
-
-              <button
-                onClick={() => { setShowUserMenu(false); mudarSenha(); }}
-                style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#333", borderBottom: "1px solid #eee" }}
-              >
-                🔑 Trocar Senha
-              </button>
-
-              <button
-                onClick={() => { handleLogout(); }}
-                style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#dc3545" }}
-              >
-                🚪 Sair
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -332,54 +317,8 @@ function AppContent() {
         <img 
           src={activeGroup?.logo_url || "/logo-app.webp"} 
           alt={`Escudo da pelada ${activeGroup?.nome_grupo || ''}`}          
-          style={{ width: "180px", height: "auto", objectFit: "contain", borderRadius: "10px" }} />
+          style={{ width: "140px", height: "auto", objectFit: "contain", borderRadius: "10px" }} />
       </div>
-
-      {/* NAVEGAÇÃO PRINCIPAL */}
-      <nav style={{ marginBottom: 30, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", position: "relative" }}>
-        
-        {/* BOTÃO DO SUPER ADMIN (Abre Submenu) */}
-        {Number(user.player_id) === 1 && (
-          <div style={{ position: "relative" }}>
-            <button 
-              onClick={() => setShowAdminMenu(!showAdminMenu)} 
-              style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: (view === "requests" || view === "admin_messages") ? "#ffc107" : "#eee", color: "#333" }}
-            >
-              👑 Administração
-            </button>
-            {showAdminMenu && (
-              <div style={{ position: "absolute", top: "45px", left: "50%", transform: "translateX(-50%)", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, overflow: "hidden", minWidth: "150px" }}>
-                <button onClick={() => handleChangeView("requests")} style={{ width: "100%", padding: "10px", border: "none", background: "#fff", cursor: "pointer", borderBottom: "1px solid #eee", fontWeight: "bold", color: "#333" }}>📋 Solicitações</button>
-                <button onClick={() => handleChangeView("admin_messages")} style={{ width: "100%", padding: "10px", border: "none", background: "#fff", cursor: "pointer", fontWeight: "bold", color: "#333" }}>✉️ Suporte</button>
-              </div>
-            )}
-          </div>
-        )}        
-
-        {isAdmin && (
-          <button onClick={() => handleChangeView("settings")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "settings" ? "#28a745" : "#eee", color: view === "settings" ? "white" : "#333" }}>
-            ⚙️ Configurações
-          </button>
-        )}
-
-        {isAdmin && (
-          <button onClick={() => handleChangeView("players")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "players" ? "#28a745" : "#eee", color: view === "players" ? "white" : "#333" }}>
-          👤 Jogadores
-          </button>
-        )}
-        <button onClick={() => handleChangeView("matches")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "matches" ? "#28a745" : "#eee", color: view === "matches" ? "white" : "#333" }}>
-          👍🏽 Confirmação
-        </button>
-        <button onClick={() => handleChangeView("teams")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "teams" ? "#28a745" : "#eee", color: view === "teams" ? "white" : "#333" }}>
-          🆎 Escalação
-        </button>
-        <button onClick={() => handleChangeView("voting")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "voting" ? "#28a745" : "#eee", color: view === "voting" ? "white" : "#333" }}>
-          🗳️ Votação
-        </button>        
-        <button onClick={() => handleChangeView("ranking")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "ranking" ? "#28a745" : "#eee", color: view === "ranking" ? "white" : "#333" }}>
-          🏆 Ranking
-        </button>
-      </nav>
 
       {/* ÁREA DE CONTEÚDO (PÁGINAS) */}
       <main>
@@ -392,6 +331,118 @@ function AppContent() {
         {view === "voting" && <VotingPage user={user} />}
         {view === "ranking" && <RankingPage />}
       </main>
+
+      {/* === PÍLULA MINIMIZADA (Aparece quando a barra desce) === */}
+      <div
+        onClick={() => setIsNavMinimized(false)}
+        style={{
+          position: "fixed",
+          bottom: isNavMinimized ? "calc(env(safe-area-inset-bottom) + 15px)" : "-60px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "rgba(0, 0, 0, 0.8)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          color: "#fff",
+          padding: "10px 24px",
+          borderRadius: "30px",
+          fontSize: "13px",
+          fontWeight: "bold",
+          boxShadow: "0 6px 16px rgba(0,0,0,0.3)",
+          zIndex: 1001,
+          cursor: "pointer",
+          transition: "bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}
+      >
+        <span style={{ fontSize: "16px" }}>👆</span> Menu
+      </div>
+
+      {/* NAVEGAÇÃO FIXA MODERNA NO RODAPÉ */}
+      <div 
+        style={{ 
+          position: "fixed", 
+          bottom: 0, 
+          left: 0, 
+          right: 0, 
+          background: "#ffffff", 
+          borderTop: "1px solid #eee", 
+          boxShadow: "0 -3px 12px rgba(0,0,0,0.08)", 
+          zIndex: 1000, 
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)",
+          transform: isNavMinimized ? "translateY(100%)" : "translateY(0)",
+          transition: "transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)"
+        }}
+      >
+        <div style={{ maxWidth: "600px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", height: "65px", padding: "0 6px", position: "relative" }}>
+          
+          <button onClick={() => handleChangeView("matches")} style={tabButtonStyle(view === "matches")}>
+            <span style={{ fontSize: "20px" }}>👍🏽</span>
+            <span style={{ fontSize: "10px", marginTop: "3px" }}>Confirmação</span>
+          </button>
+
+          <button onClick={() => handleChangeView("teams")} style={tabButtonStyle(view === "teams")}>
+            <span style={{ fontSize: "20px" }}>🆎</span>
+            <span style={{ fontSize: "10px", marginTop: "3px" }}>Escalação</span>
+          </button>
+
+          <button onClick={() => handleChangeView("voting")} style={tabButtonStyle(view === "voting")}>
+            <span style={{ fontSize: "20px" }}>🗳️</span>
+            <span style={{ fontSize: "10px", marginTop: "3px" }}>Votação</span>
+          </button>
+
+          <button onClick={() => handleChangeView("ranking")} style={tabButtonStyle(view === "ranking")}>
+            <span style={{ fontSize: "20px" }}>🏆</span>
+            <span style={{ fontSize: "10px", marginTop: "3px" }}>Ranking</span>
+          </button>
+
+          {/* ABA DO MENU DE OPÇÕES (ABRE DA PARTE INFERIOR PARA CIMA) */}
+          <button onClick={(e) => { e.stopPropagation(); setShowUserMenu(!showUserMenu); renovarSessao(); }} style={tabButtonStyle(isMenuView || showUserMenu, true)}>
+            <span style={{ fontSize: "20px" }}>☰</span>
+            <span style={{ fontSize: "10px", marginTop: "3px" }}>Menu</span>
+          </button>
+
+          {/* COMPONENTE DO MENU FLUTUANTE (POPOVER INVERTIDO) */}
+          {showUserMenu && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "absolute", bottom: "75px", right: "15px", background: "#fff", border: "1px solid #ddd",
+                borderRadius: "12px", boxShadow: "0 -6px 20px rgba(0,0,0,0.15)", minWidth: "200px", zIndex: 2000, overflow: "hidden", display: "flex", flexDirection: "column"
+              }}
+            >
+              {/* SEÇÃO EXCLUSIVA DO DONO DO APP (SUPER ADMIN) */}
+              {Number(user.player_id) === 1 && (
+                <>
+                  <div style={{ padding: "6px 14px", background: "#f8f9fa", fontSize: "10px", fontWeight: "bold", color: "#999", textAlign: "left" }}>SISTEMA</div>
+                  <button onClick={() => handleChangeView("requests")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "requests" ? "#ffb300" : "#333", borderBottom: "1px solid #f5f5f5" }}>📋 Solicitações Geral</button>
+                  <button onClick={() => handleChangeView("admin_messages")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "admin_messages" ? "#ffb300" : "#333", borderBottom: "1px solid #f5f5f5" }}>✉️ Caixa de Suporte</button>
+                </>
+              )}
+
+              {/* SEÇÃO DO ADMINISTRADOR DA PELADA */}
+              {isAdmin && (
+                <>
+                  <div style={{ padding: "6px 14px", background: "#f8f9fa", fontSize: "10px", fontWeight: "bold", color: "#999", textAlign: "left" }}>GERENCIAR PELADA</div>
+                  <button onClick={() => handleChangeView("settings")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "settings" ? "#28a745" : "#333", borderBottom: "1px solid #f5f5f5" }}>⚙️ Configurações</button>
+                  <button onClick={() => handleChangeView("players")} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "players" ? "#28a745" : "#333", borderBottom: "1px solid #f5f5f5" }}>👤 Modificar Jogadores</button>
+                  <button onClick={() => { setShowUserMenu(false); setSupportModalOpen(true); }} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#ffc107", borderBottom: "1px solid #f5f5f5" }}>📢 Chamar Suporte</button>
+                </>
+              )}
+
+              {/* SEÇÃO DE CONTA E SESSÃO GERAL */}
+              <div style={{ padding: "6px 14px", background: "#f8f9fa", fontSize: "10px", fontWeight: "bold", color: "#999", textAlign: "left" }}>SUA CONTA</div>
+              {(user.user_groups?.length > 1) && (
+                <button onClick={() => { setShowUserMenu(false); clearGroup(); }} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#007bff", borderBottom: "1px solid #f5f5f5" }}>🔄 Trocar de Pelada</button>
+              )}
+              <button onClick={() => { setShowUserMenu(false); mudarSenha(); }} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#333", borderBottom: "1px solid #f5f5f5" }}>🔑 Alterar Senha</button>
+              <button onClick={() => handleLogout()} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#dc3545" }}>🚪 Sair do App</button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* === MODAL DE SUPORTE === */}
       {supportModalOpen && (
