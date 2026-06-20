@@ -13,7 +13,6 @@ export default function PointsRankingPage() {
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [ranking, setRanking] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [hoveredPlayerId, setHoveredPlayerId] = useState(null);
   const [hoveredCell, setHoveredCell] = useState(null);
   
   const [isOngoing, setIsOngoing] = useState(false);
@@ -43,7 +42,7 @@ export default function PointsRankingPage() {
     } else if (!loading) {
       setRanking([]);
     }
-  }, [mode, selectedMatchId, matches, pontuacaoConfig]); // Atualiza se a config mudar
+  }, [mode, selectedMatchId, matches, pontuacaoConfig]); 
 
   const loadBaseData = async () => {
     setLoading(true);
@@ -325,41 +324,71 @@ export default function PointsRankingPage() {
         row.PT += assistencias * pAS;
       });
 
+      // === LÓGICA DE APURAÇÃO DE VOTOS INDEPENDENTE ===
       const matchRounds = votesByMatch[match.id] || { round1: [], round2: [] };
-      const activeVotes = matchRounds.round2.length > 0 ? matchRounds.round2 : matchRounds.round1;
+      const votesT1 = matchRounds.round1;
+      const votesT2 = matchRounds.round2;
 
-      const cheiaCount = {};
-      const murchaCount = {};
+      if (votesT1.length > 0) {
+        const cheiaCountT1 = {};
+        const murchaCountT1 = {};
 
-      activeVotes.forEach((vote) => {
-        if (vote.bola_cheia_player_id) {
-          cheiaCount[vote.bola_cheia_player_id] = (cheiaCount[vote.bola_cheia_player_id] || 0) + 1;
+        votesT1.forEach((vote) => {
+          if (vote.bola_cheia_player_id) cheiaCountT1[vote.bola_cheia_player_id] = (cheiaCountT1[vote.bola_cheia_player_id] || 0) + 1;
+          if (vote.bola_murcha_player_id) murchaCountT1[vote.bola_murcha_player_id] = (murchaCountT1[vote.bola_murcha_player_id] || 0) + 1;
+        });
+
+        const maxCheiaT1 = Math.max(...Object.values(cheiaCountT1), 0);
+        const maxMurchaT1 = Math.max(...Object.values(murchaCountT1), 0);
+
+        const empatadosCheia = Object.keys(cheiaCountT1).filter(id => cheiaCountT1[id] === maxCheiaT1 && maxCheiaT1 > 0);
+        const empatadosMurcha = Object.keys(murchaCountT1).filter(id => murchaCountT1[id] === maxMurchaT1 && maxMurchaT1 > 0);
+
+        const cheiaFinalCount = {};
+        const murchaFinalCount = {};
+
+        const hasT2CheiaVotes = votesT2.some(v => v.bola_cheia_player_id);
+        const hasT2MurchaVotes = votesT2.some(v => v.bola_murcha_player_id);
+
+        if (empatadosCheia.length > 1 && hasT2CheiaVotes) {
+          votesT2.forEach(v => {
+            if (v.bola_cheia_player_id) cheiaFinalCount[v.bola_cheia_player_id] = (cheiaFinalCount[v.bola_cheia_player_id] || 0) + 1;
+          });
+        } else {
+          Object.assign(cheiaFinalCount, cheiaCountT1);
         }
-        if (vote.bola_murcha_player_id) {
-          murchaCount[vote.bola_murcha_player_id] = (murchaCount[vote.bola_murcha_player_id] || 0) + 1;
-        }
-      });
 
-      const maxCheia = Math.max(0, ...Object.values(cheiaCount));
-      const maxMurcha = Math.max(0, ...Object.values(murchaCount));
-
-      Object.entries(cheiaCount).forEach(([playerId, total]) => {
-        if (total === maxCheia && maxCheia > 0) {
-          const row = ensurePlayer(Number(playerId));
-          if (!row) return;
-          row.BC += 1; 
-          row.PT += pBC;  
+        if (empatadosMurcha.length > 1 && hasT2MurchaVotes) {
+          votesT2.forEach(v => {
+            if (v.bola_murcha_player_id) murchaFinalCount[v.bola_murcha_player_id] = (murchaFinalCount[v.bola_murcha_player_id] || 0) + 1;
+          });
+        } else {
+          Object.assign(murchaFinalCount, murchaCountT1);
         }
-      });
 
-      Object.entries(murchaCount).forEach(([playerId, total]) => {
-        if (total === maxMurcha && maxMurcha > 0) {
-          const row = ensurePlayer(Number(playerId));
-          if (!row) return;
-          row.BM += 1; 
-          row.PT += pBM;  
-        }
-      });
+        const maxCheiaFinal = Math.max(...Object.values(cheiaFinalCount), 0);
+        const maxMurchaFinal = Math.max(...Object.values(murchaFinalCount), 0);
+
+        Object.entries(cheiaFinalCount).forEach(([playerId, total]) => {
+          if (total === maxCheiaFinal && maxCheiaFinal > 0) {
+            const row = ensurePlayer(Number(playerId));
+            if (row) {
+              row.BC += 1; 
+              row.PT += pBC;
+            }
+          }
+        });
+
+        Object.entries(murchaFinalCount).forEach(([playerId, total]) => {
+          if (total === maxMurchaFinal && maxMurchaFinal > 0) {
+            const row = ensurePlayer(Number(playerId));
+            if (row) {
+              row.BM += 1; 
+              row.PT += pBM;
+            }
+          }
+        });
+      }
     });
 
     let rankingFinal = Object.values(rankingMap);
