@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { useGroup } from "../contexts/GroupContext";
 
-// Mesmas Constantes de Tempo da página de votação
 const DURACAO_T1 = 15 * 60 * 1000; 
 const INTERVALO = 1 * 60 * 1000;
 const DURACAO_T2 = 10 * 60 * 1000;
@@ -23,7 +22,6 @@ export default function BallRankingPage() {
   const carregarRanking = async () => {
     setLoading(true);
 
-    // 1. Carrega os Jogos (Matches) isolados por pelada
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
       .select("*")
@@ -36,7 +34,6 @@ export default function BallRankingPage() {
       return;
     }
 
-    // 2. Carrega todos os votos isolados por pelada
     const { data: votesData, error: votesError } = await supabase
       .from("match_votes")
       .select("*")
@@ -48,7 +45,6 @@ export default function BallRankingPage() {
       return;
     }
 
-    // 3. === CORREÇÃO: Carrega os jogadores isolados por pelada via grupo_membros ===
     const { data: membrosData, error: playersError } = await supabase
       .from("grupo_membros")
       .select(`
@@ -58,7 +54,7 @@ export default function BallRankingPage() {
       .eq("id_grupo", activeGroup.id_grupo)
       .eq("is_hidden", false)
       .neq("player_id", 1)
-      .eq("is_spectator", false); // Espectador não entra no ranking
+      .eq("is_spectator", false); 
 
     if (playersError) {
       console.error("Erro ao carregar jogadores:", playersError);
@@ -66,7 +62,6 @@ export default function BallRankingPage() {
       return;
     }
 
-    // Achata os dados para o formato que a lógica abaixo já espera
     const playersData = (membrosData || []).map((m) => ({
       id: m.players.id,
       name: m.players.name,
@@ -76,35 +71,26 @@ export default function BallRankingPage() {
 
     const now = new Date();
     const partidasFinalizadasIds = new Set();
-
-    // === MUDANÇA: Busca a hora do jogo do grupo dinamicamente ===
     const horaJogo = activeGroup?.hora_jogo_grupo ? activeGroup.hora_jogo_grupo.slice(0, 5) + ':00' : "22:30:00";
 
-    // 4. Identifica quais partidas já terminaram a votação
     (matchesData || []).forEach((match) => {
-
-      // Calcula o início do jogo e soma 90 min para o início do 1º turno de votação
       const matchStart = new Date(`${match.date}T${horaJogo}-03:00`);
       const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000);
-
       const t1End = new Date(t1Start.getTime() + DURACAO_T1);
       const t2Start = new Date(t1End.getTime() + INTERVALO);
       const t2End = new Date(t2Start.getTime() + DURACAO_T2);
 
-      // Só consideramos a partida válida se o tempo final do 2º turno já passou
       if (now > t2End && match.is_drawn) {
         partidasFinalizadasIds.add(match.id);
       }
     });
 
-    // 5. Agrupa votos APENAS das partidas finalizadas E separa por Turno (Round)
     const votesByMatch = {};
     (votesData || []).forEach((vote) => {
       if (partidasFinalizadasIds.has(vote.match_id)) {
         if (!votesByMatch[vote.match_id]) {
           votesByMatch[vote.match_id] = { round1: [], round2: [] };
         }
-        
         if (vote.round === 2) {
           votesByMatch[vote.match_id].round2.push(vote);
         } else {
@@ -113,63 +99,83 @@ export default function BallRankingPage() {
       }
     });
 
-    // Contadores e Mapas de Data
     const cheiaWinsMap = {};
     const murchaWinsMap = {};
     const cheiaLastDateMap = {};
     const murchaLastDateMap = {};
 
-    // 6. Calcula os vencedores iterando pelas partidas (da mais nova para a mais velha)
     (matchesData || []).forEach((match) => {
-      // Ignora a partida se a votação ainda não acabou
       if (!partidasFinalizadasIds.has(match.id)) return;
 
       const matchRounds = votesByMatch[match.id];
       if (!matchRounds) return;
 
-      // Prioriza o Turno 2 se houver votos nele.
-      const activeVotes = matchRounds.round2.length > 0 ? matchRounds.round2 : matchRounds.round1;
+      const votesT1 = matchRounds.round1;
+      const votesT2 = matchRounds.round2;
 
-      if (activeVotes.length === 0) return;
+      // Se não teve nem 1º turno, pula
+      if (votesT1.length === 0) return;
 
-      const cheiaCount = {};
-      const murchaCount = {};
+      // 1. Apura o Turno 1 para saber quem empatou
+      const cheiaCountT1 = {};
+      const murchaCountT1 = {};
 
-      activeVotes.forEach((vote) => {
-        cheiaCount[vote.bola_cheia_player_id] = (cheiaCount[vote.bola_cheia_player_id] || 0) + 1;
-        murchaCount[vote.bola_murcha_player_id] = (murchaCount[vote.bola_murcha_player_id] || 0) + 1;
+      votesT1.forEach((vote) => {
+        if (vote.bola_cheia_player_id) cheiaCountT1[vote.bola_cheia_player_id] = (cheiaCountT1[vote.bola_cheia_player_id] || 0) + 1;
+        if (vote.bola_murcha_player_id) murchaCountT1[vote.bola_murcha_player_id] = (murchaCountT1[vote.bola_murcha_player_id] || 0) + 1;
       });
 
-      const maxCheia = Math.max(...Object.values(cheiaCount), 0);
-      const maxMurcha = Math.max(...Object.values(murchaCount), 0);
+      const maxCheiaT1 = Math.max(...Object.values(cheiaCountT1), 0);
+      const maxMurchaT1 = Math.max(...Object.values(murchaCountT1), 0);
 
-      // --- BOLA CHEIA ---
-      Object.entries(cheiaCount).forEach(([playerId, total]) => {
-        if (total === maxCheia && maxCheia > 0) {
+      const empatadosCheia = Object.keys(cheiaCountT1).filter(id => cheiaCountT1[id] === maxCheiaT1 && maxCheiaT1 > 0);
+      const empatadosMurcha = Object.keys(murchaCountT1).filter(id => murchaCountT1[id] === maxMurchaT1 && maxMurchaT1 > 0);
+
+      // 2. Apura os votos definitivos (Pega do T2 se houve desempate, senão consolida o T1)
+      const cheiaFinalCount = {};
+      const murchaFinalCount = {};
+
+      // --- LÓGICA BOLA CHEIA ---
+      if (empatadosCheia.length > 1 && votesT2.length > 0) {
+        // Usa votos do T2
+        votesT2.forEach(v => {
+          if (v.bola_cheia_player_id) cheiaFinalCount[v.bola_cheia_player_id] = (cheiaFinalCount[v.bola_cheia_player_id] || 0) + 1;
+        });
+      } else {
+        // Usa votos do T1
+        Object.assign(cheiaFinalCount, cheiaCountT1);
+      }
+
+      // --- LÓGICA BOLA MURCHA ---
+      if (empatadosMurcha.length > 1 && votesT2.length > 0) {
+        // Usa votos do T2
+        votesT2.forEach(v => {
+          if (v.bola_murcha_player_id) murchaFinalCount[v.bola_murcha_player_id] = (murchaFinalCount[v.bola_murcha_player_id] || 0) + 1;
+        });
+      } else {
+        // Usa votos do T1
+        Object.assign(murchaFinalCount, murchaCountT1);
+      }
+
+      const maxCheiaFinal = Math.max(...Object.values(cheiaFinalCount), 0);
+      const maxMurchaFinal = Math.max(...Object.values(murchaFinalCount), 0);
+
+      // Atribui as vitórias finais
+      Object.entries(cheiaFinalCount).forEach(([playerId, total]) => {
+        if (total === maxCheiaFinal && maxCheiaFinal > 0) {
           cheiaWinsMap[playerId] = (cheiaWinsMap[playerId] || 0) + 1;
-          
-          // Como as partidas estão ordenadas da mais nova para a mais velha, 
-          // a primeira vez que passamos aqui é a vitória mais recente do jogador
-          if (!cheiaLastDateMap[playerId]) {
-            cheiaLastDateMap[playerId] = match.date;
-          }
+          if (!cheiaLastDateMap[playerId]) cheiaLastDateMap[playerId] = match.date;
         }
       });
 
-      // --- BOLA MURCHA ---
-      Object.entries(murchaCount).forEach(([playerId, total]) => {
-        if (total === maxMurcha && maxMurcha > 0) {
+      Object.entries(murchaFinalCount).forEach(([playerId, total]) => {
+        if (total === maxMurchaFinal && maxMurchaFinal > 0) {
           murchaWinsMap[playerId] = (murchaWinsMap[playerId] || 0) + 1;
-          
-          // Salva a data da vitória mais recente
-          if (!murchaLastDateMap[playerId]) {
-            murchaLastDateMap[playerId] = match.date;
-          }
+          if (!murchaLastDateMap[playerId]) murchaLastDateMap[playerId] = match.date;
         }
       });
     });
 
-    // 7. Monta o ranking final aplicando o critério de desempate
     const rankingFinalCheia = (playersData || [])
       .map((player) => ({
         id: player.id,
@@ -177,19 +183,14 @@ export default function BallRankingPage() {
         position: player.position,
         shirt_number: player.shirt_number,
         total: cheiaWinsMap[player.id] || 0,
-        lastWinDate: cheiaLastDateMap[player.id] || "1970-01-01" // fallback caso nunca tenha ganho
+        lastWinDate: cheiaLastDateMap[player.id] || "1970-01-01" 
       }))
       .filter((player) => player.total > 0)
       .sort((a, b) => {
-        // Critério 1: Maior número de vitórias
         if (b.total !== a.total) return b.total - a.total; 
-        
-        // Critério 2: Desempate pela Data (quem ganhou mais recentemente fica na frente)
         const dateA = new Date(a.lastWinDate).getTime();
         const dateB = new Date(b.lastWinDate).getTime();
         if (dateB !== dateA) return dateB - dateA;
-
-        // Critério 3: Ordem alfabética
         return a.name.localeCompare(b.name);
       });
 
@@ -204,15 +205,10 @@ export default function BallRankingPage() {
       }))
       .filter((player) => player.total > 0)
       .sort((a, b) => {
-        // Critério 1: Maior número de vitórias
         if (b.total !== a.total) return b.total - a.total; 
-        
-        // Critério 2: Desempate pela Data
         const dateA = new Date(a.lastWinDate).getTime();
         const dateB = new Date(b.lastWinDate).getTime();
         if (dateB !== dateA) return dateB - dateA;
-
-        // Critério 3: Ordem alfabética
         return a.name.localeCompare(b.name);
       });
 

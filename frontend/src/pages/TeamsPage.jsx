@@ -398,12 +398,13 @@ export default function TeamsPage({ user }) {
 
   const getEligibleNonConfirmedPlayers = async (excludePlayerId = null) => {
     const { data } = await supabase.from("match_player").select("*").eq("match_id", selectedMatch.id);
-    const statusOrder = { null_status: 1, duvida: 2, nao_vai: 3 };
+    
+    // Adicionado 'confirmado: 0' para que jogadores que estão sobrando/excluídos apareçam no TOPO da lista
+    const statusOrder = { confirmado: 0, null_status: 1, duvida: 2, nao_vai: 3 };
 
     return (data || [])
       .filter((item) => excludePlayerId !== null ? Number(item.player_id) !== Number(excludePlayerId) : true)
-      .filter((item) => !item.team)
-      .filter((item) => String(item.status || "").trim().toLowerCase() !== "confirmado")
+      .filter((item) => !item.team) // Regra: Basta não estar em nenhum time
       .map((item) => {
         const playerData = allPlayers.find((p) => Number(p.id) === Number(item.player_id));
         if (!playerData) return null;
@@ -559,9 +560,21 @@ export default function TeamsPage({ user }) {
   };
 
   const renderTeamCard = (title, borderColor, team, score, setScore, teamKey) => (
-    <div style={{ width: "100%", background: "#fff", padding: "15px", borderRadius: "10px", border: `3px solid ${borderColor}`, boxShadow: "0 4px 6px rgba(0,0,0,0.06)", boxSizing: "border-box" }}>
-      <h3 style={{ textAlign: "center", color: "#000102", marginTop: 0, marginBottom: "15px", fontWeight: "bold", fontSize: "16px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
-        {title} <span style={{ fontSize: "10px", color: "#666", fontWeight: "normal" }}>(⭐ {calcForca(team)})</span>
+    <div style={{ 
+      width: "100%", background: "#fff", 
+      padding: selectedMatch.is_drawn ? "15px" : "10px", 
+      borderRadius: "10px", border: `3px solid ${borderColor}`, 
+      boxShadow: "0 4px 6px rgba(0,0,0,0.06)", boxSizing: "border-box" 
+    }}>
+      <h3 style={{ 
+        textAlign: "center", color: "#000102", marginTop: 0, 
+        marginBottom: selectedMatch.is_drawn ? "15px" : "12px", 
+        fontWeight: "bold", fontSize: selectedMatch.is_drawn ? "16px" : "14px", 
+        display: "flex", flexDirection: selectedMatch.is_drawn ? "row" : "column", 
+        justifyContent: "center", alignItems: "center", gap: selectedMatch.is_drawn ? "8px" : "4px" 
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>{title}</div>
+        <span style={{ fontSize: "10px", color: "#666", fontWeight: "normal" }}>(⭐ {calcForca(team)})</span>
       </h3>
 
       {selectedMatch.is_drawn && isAdmin && (
@@ -590,10 +603,10 @@ export default function TeamsPage({ user }) {
       )}
 
       {ordenarPorPosicao(team).filter(Boolean).map((p) => (
-        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f1f1", alignItems: "center", fontSize: "15px", color: "#333", gap: "5px" }}>
+        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: selectedMatch.is_drawn ? "8px 0" : "6px 0", borderBottom: "1px solid #f1f1f1", alignItems: "center", fontSize: "15px", color: "#333", gap: "5px" }}>
           
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, gap: "4px" }}>
-            <span style={{ textAlign: "left", fontSize: "13px", fontWeight: "bold", color: "#333", lineHeight: "1.2", wordWrap: "break-word" }}>
+            <span style={{ textAlign: "left", fontSize: selectedMatch.is_drawn ? "13px" : "12px", fontWeight: "bold", color: "#333", lineHeight: "1.2", wordWrap: "break-word" }}>
               {p.name}
             </span>
 
@@ -667,7 +680,16 @@ export default function TeamsPage({ user }) {
           </div>
 
           {(teamA.length > 0 || teamB.length > 0) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "25px", width: "100%" }}>
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: selectedMatch.is_drawn 
+                ? "1fr" 
+                : (isTresTimes ? "1fr 1fr 1fr" : "1fr 1fr"), 
+              gap: selectedMatch.is_drawn ? "20px" : "10px", 
+              marginBottom: "25px", 
+              width: "100%",
+              alignItems: "start"
+            }}>
               {renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorA }}></span> {displayNomeA}</>, displayCorA, teamA, scoreA, setScoreA, "A")}
               {renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorB }}></span> {displayNomeB}</>, displayCorB, teamB, scoreB, setScoreB, "B")}
               {isTresTimes && renderTeamCard(<><span style={{ display: 'inline-block', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: displayCorC }}></span> {displayNomeC}</>, displayCorC, teamC, scoreC, setScoreC, "C")}

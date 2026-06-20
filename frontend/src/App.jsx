@@ -373,11 +373,11 @@ function AppContent() {
         <button onClick={() => handleChangeView("teams")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "teams" ? "#28a745" : "#eee", color: view === "teams" ? "white" : "#333" }}>
           🆎 Escalação
         </button>
-        <button onClick={() => handleChangeView("ranking")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "ranking" ? "#28a745" : "#eee", color: view === "ranking" ? "white" : "#333" }}>
-          🏆 Ranking
-        </button>
         <button onClick={() => handleChangeView("voting")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "voting" ? "#28a745" : "#eee", color: view === "voting" ? "white" : "#333" }}>
           🗳️ Votação
+        </button>        
+        <button onClick={() => handleChangeView("ranking")} style={{ padding: "10px 20px", borderRadius: "20px", border: "none", cursor: "pointer", fontWeight: "bold", background: view === "ranking" ? "#28a745" : "#eee", color: view === "ranking" ? "white" : "#333" }}>
+          🏆 Ranking
         </button>
       </nav>
 
@@ -389,8 +389,8 @@ function AppContent() {
         {view === "players" && isAdmin && <PlayersPage user={user} />}
         {view === "matches" && <MatchesPage user={user} />}
         {view === "teams" && <TeamsPage user={user} />}
-        {view === "ranking" && <RankingPage />}
         {view === "voting" && <VotingPage user={user} />}
+        {view === "ranking" && <RankingPage />}
       </main>
 
       {/* === MODAL DE SUPORTE === */}

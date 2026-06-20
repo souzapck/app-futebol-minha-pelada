@@ -208,6 +208,27 @@ export default function BallVotePage({ user }) {
     return () => clearInterval(interval);
   }, [selectedMatchId, matches, currentRound, runoffCandidates, activeGroup]);
 
+  // === CALCULA O STATUS DA VOTAÇÃO PARA O DROPDOWN ===
+  const getVotingStatusLabel = (match, index) => {
+    if (index !== 0) return "🔒 (Encerrada)"; 
+    if (!match.is_drawn) return "⏳ (Aguardando jogo)";
+
+    const now = new Date();
+    const horaCrua = activeGroup?.hora_jogo_grupo || "22:30:00"; 
+    const [ano, mes, dia] = match.date.split("-").map(Number);
+    const [hora, minuto, segundo] = horaCrua.split(":").map(Number);
+    
+    const matchStart = new Date(ano, mes - 1, dia, hora, minuto, segundo || 0);
+    if (isNaN(matchStart.getTime())) return "🔒 (Encerrada)";
+    
+    const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000); 
+    const t2End = new Date(t1Start.getTime() + DURACAO_T1 + INTERVALO + DURACAO_T2);
+
+    if (now < t1Start) return "⏳ (Aguardando)";
+    if (now > t2End) return "🔒 (Encerrada)";
+    return "🟢 (Aberta)";
+  };
+
   const getRunoffCandidates = (votesT1) => {
     const counts = votesT1.reduce((acc, v) => {
       if (v.bola_cheia_player_id) acc.c[v.bola_cheia_player_id] = (acc.c[v.bola_cheia_player_id] || 0) + 1;
@@ -353,7 +374,7 @@ export default function BallVotePage({ user }) {
                       </span>
                     )}
 
-                    <span style={{ fontSize: "14px", fontWeight: "bold", color: "#333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <span style={{ fontSize: "12px", fontWeight: "bold", color: "#333", whiteSpace: "normal", wordBreak: "break-word", lineHeight: "1.2" }}>
                       {p.name} {p.id === user?.player_id && <small style={{color: "#888", fontWeight: "normal"}}>(Você)</small>}
                     </span>
                   </div>
@@ -363,7 +384,7 @@ export default function BallVotePage({ user }) {
                       <button 
                         onClick={() => setBolaCheiaId(p.id)} 
                         disabled={disableClick}
-                        style={{ padding: "8px 10px", fontSize: "13px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaCheiaId === p.id ? "#28a745" : "#e9ecef", color: bolaCheiaId === p.id ? "#fff" : "#333" }}
+                        style={{ padding: "6px 8px", fontSize: "11px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaCheiaId === p.id ? "#28a745" : "#e9ecef", color: bolaCheiaId === p.id ? "#fff" : "#333" }}
                       >
                         ⚽ Cheia
                       </button>
@@ -372,7 +393,7 @@ export default function BallVotePage({ user }) {
                       <button 
                         onClick={() => setBolaMurchaId(p.id)} 
                         disabled={disableClick}
-                        style={{ padding: "8px 10px", fontSize: "13px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaMurchaId === p.id ? "#dc3545" : "#e9ecef", color: bolaMurchaId === p.id ? "#fff" : "#333" }}
+                        style={{ padding: "6px 8px", fontSize: "11px", borderRadius: "6px", border: "none", cursor: disableClick ? "not-allowed" : "pointer", background: bolaMurchaId === p.id ? "#dc3545" : "#e9ecef", color: bolaMurchaId === p.id ? "#fff" : "#333" }}
                       >
                         🎈 Murcha
                       </button>
@@ -411,7 +432,6 @@ export default function BallVotePage({ user }) {
     const votesT1 = allVotes.filter(v => v.round === 1);
     const votesT2 = allVotes.filter(v => v.round === 2);
 
-    // No 1º turno sempre mostra ambos. No 2º turno, só mostra a categoria que teve desempate.
     const showCheia = round === 1 || runoffCandidates.cheia.length > 1;
     const showMurcha = round === 1 || runoffCandidates.murcha.length > 1;
 
@@ -439,6 +459,7 @@ export default function BallVotePage({ user }) {
         });
     };
 
+    // AQUI O CARD DE RESUMO MOSTRA A REALIDADE EXATA DAQUELE TURNO (SE NÃO HOUVE VOTOS, FICA VAZIO)
     if (showCheia) rankingCheia = processRanking('C', round === 2 ? votesT2 : votesT1);
     if (showMurcha) rankingMurcha = processRanking('M', round === 2 ? votesT2 : votesT1);
 
@@ -451,7 +472,6 @@ export default function BallVotePage({ user }) {
     vencedoresC = getWinners(rankingCheia);
     vencedoresM = getWinners(rankingMurcha);
 
-    // Ajusta o Grid baseado em quantas categorias serão exibidas (1fr 1fr ou apenas 1fr)
     const gridColumns = (showCheia && showMurcha) ? "1fr 1fr" : "1fr";
 
     return (
@@ -464,7 +484,6 @@ export default function BallVotePage({ user }) {
           </div>
         ) : (
           <>
-            {/* GRID DOS VENCEDORES */}
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: "15px", marginBottom: "25px" }}>
               {showCheia && (
                 <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #c3e6cb" }}>
@@ -485,7 +504,6 @@ export default function BallVotePage({ user }) {
               )}
             </div>
 
-            {/* GRID DOS VOTADOS (HISTÓRICO) */}
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: "20px" }}>
               {showCheia && (
                 <div>
@@ -515,7 +533,6 @@ export default function BallVotePage({ user }) {
     );
   };
 
-  // === NOVO: CARD DOS ELEITOS (PÓDIO FINAL) ===
   const renderFinalWinnersCard = () => {
     const getWinners = (type, targetRound) => {
       const votes = allVotes.filter(v => v.round === targetRound);
@@ -535,8 +552,15 @@ export default function BallVotePage({ user }) {
       return ranking.filter(r => r.total === max);
     };
 
-    const finalCheia = runoffCandidates.cheia.length > 1 ? getWinners('C', 2) : getWinners('C', 1);
-    const finalMurcha = runoffCandidates.murcha.length > 1 ? getWinners('M', 2) : getWinners('M', 1);
+    // === PROTEÇÃO DE FALLBACK APENAS PARA O PÓDIO FINAL ===
+    // Analisamos se a urna do 2º turno não ficou completamente vazia
+    const votesT2 = allVotes.filter(v => v.round === 2);
+    const hasT2CheiaVotes = votesT2.some(v => v.bola_cheia_player_id);
+    const hasT2MurchaVotes = votesT2.some(v => v.bola_murcha_player_id);
+
+    // Se houve desempate mas NINGUÉM votou na categoria (T2 vazio), buscamos os empatados do 1º turno!
+    let finalCheia = (runoffCandidates.cheia.length > 1 && hasT2CheiaVotes) ? getWinners('C', 2) : getWinners('C', 1);
+    let finalMurcha = (runoffCandidates.murcha.length > 1 && hasT2MurchaVotes) ? getWinners('M', 2) : getWinners('M', 1);
 
     if (finalCheia.length === 0 && finalMurcha.length === 0) return null;
 
@@ -581,9 +605,9 @@ export default function BallVotePage({ user }) {
           style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "15px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
         >
           <option value="">Selecione a data...</option>
-          {matches.map(m => (
+          {matches.map((m, index) => (
             <option key={m.id} value={m.id}>
-              {m.date.split("-").reverse().join("/")} {m.is_drawn ? "🔒 (Fechada)" : "🎲 (Aberto)"}
+              {m.date.split("-").reverse().join("/")} {getVotingStatusLabel(m, index)}
             </option>
           ))}
         </select>
