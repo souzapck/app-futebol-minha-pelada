@@ -661,12 +661,12 @@ export default function TeamsPage({ user }) {
               if (match) loadMatchData(match);
             }
           }} 
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "15px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
+          style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "14px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
         >
           <option value="">Selecione a data...</option>
           {matches.map(m => (
             <option key={m.id} value={m.id}>
-              {m.date.split("-").reverse().join("/")} {m.is_drawn ? "🔒 (Fechada)" : "🎲 (Aberto)"}
+              {m.date.split("-").reverse().join("/")} {m.is_drawn ? "🔒 Fechada" : "🎲 Aberto"}
             </option>
           ))}
         </select>

@@ -210,8 +210,8 @@ export default function BallVotePage({ user }) {
 
   // === CALCULA O STATUS DA VOTAÇÃO PARA O DROPDOWN ===
   const getVotingStatusLabel = (match, index) => {
-    if (index !== 0) return "🔒 (Encerrada)"; 
-    if (!match.is_drawn) return "⏳ (Aguardando jogo)";
+    if (index !== 0) return "🔒 Encerrada"; 
+    if (!match.is_drawn) return "⏳ Aguardando jogo";
 
     const now = new Date();
     const horaCrua = activeGroup?.hora_jogo_grupo || "22:30:00"; 
@@ -219,14 +219,14 @@ export default function BallVotePage({ user }) {
     const [hora, minuto, segundo] = horaCrua.split(":").map(Number);
     
     const matchStart = new Date(ano, mes - 1, dia, hora, minuto, segundo || 0);
-    if (isNaN(matchStart.getTime())) return "🔒 (Encerrada)";
+    if (isNaN(matchStart.getTime())) return "🔒 Encerrada";
     
     const t1Start = new Date(matchStart.getTime() + 90 * 60 * 1000); 
     const t2End = new Date(t1Start.getTime() + DURACAO_T1 + INTERVALO + DURACAO_T2);
 
-    if (now < t1Start) return "⏳ (Aguardando)";
-    if (now > t2End) return "🔒 (Encerrada)";
-    return "🟢 (Aberta)";
+    if (now < t1Start) return "⏳ Aguardando";
+    if (now > t2End) return "🔒 Encerrada";
+    return "🟢 Aberta";
   };
 
   const getRunoffCandidates = (votesT1) => {
@@ -602,7 +602,7 @@ export default function BallVotePage({ user }) {
           setSelectedMatchId(e.target.value);
           loadConfirmedPlayers(e.target.value);
           }} 
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "15px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
+          style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "14px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
         >
           <option value="">Selecione a data...</option>
           {matches.map((m, index) => (
