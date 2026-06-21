@@ -6,7 +6,6 @@ import { useGroup } from "../contexts/GroupContext";
 const getNextMatchDate = (diaPreferido) => {
   const hoje = new Date();
   
-  // Função auxiliar para formatar a data na hora LOCAL (evita o bug do fuso horário do toISOString)
   const formatLocal = (data) => {
     const ano = data.getFullYear();
     const mes = String(data.getMonth() + 1).padStart(2, "0");
@@ -14,32 +13,28 @@ const getNextMatchDate = (diaPreferido) => {
     return `${ano}-${mes}-${dia}`;
   };
 
-  // Se o grupo não tiver dia configurado, sugere a data de hoje para não quebrar
   if (!diaPreferido) return formatLocal(hoje);
 
-  // Mapa para entender o que vem do banco (aceita "Segunda", "terça-feira", "SABADO", etc)
   const mapaDias = { 
     "domingo": 0, "segunda": 1, "terca": 2, "quarta": 3, 
     "quinta": 4, "sexta": 5, "sabado": 6 
   };
 
-  // Limpa o texto que vier do banco (tira espaços extras, acentos, hífens e deixa minúsculo)
   const diaLimpo = String(diaPreferido)
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Tira acentos
-    .trim() // Tira espaços nas pontas
-    .split("-")[0] // Tira o "-feira" se tiver
-    .trim(); // Garante que não sobrou espaço
+    .replace(/[\u0300-\u036f]/g, "") 
+    .trim() 
+    .split("-")[0] 
+    .trim(); 
 
   const targetDay = mapaDias[diaLimpo];
 
-  // Se o nome do dia vier esquisito e não bater com o mapa, devolve hoje
   if (targetDay === undefined) return formatLocal(hoje);
 
   let diff = targetDay - hoje.getDay();
   if (diff < 0) {
-    diff += 7; // Se o dia já passou nesta semana, joga para a próxima semana
+    diff += 7; 
   }
 
   const proximaData = new Date(hoje);
@@ -73,7 +68,6 @@ export default function MatchesPage({ user }) {
   }, [activeGroup]);
 
   const loadData = async () => {
-      // === 1. BUSCANDO O DIA DO JOGO DIRETO NA FONTE ===
       const { data: grupoData } = await supabase
         .from("grupos_pelada")
         .select("dia_jogo_grupo")
@@ -83,9 +77,8 @@ export default function MatchesPage({ user }) {
       if (grupoData && grupoData.dia_jogo_grupo) {
         setNewMatchDate(getNextMatchDate(grupoData.dia_jogo_grupo));
       } else {
-        setNewMatchDate(getNextMatchDate(null)); // Se não tiver nada no banco, bota hoje
+        setNewMatchDate(getNextMatchDate(null)); 
       }
-      // ==================================================
 
       const { data: matchesData, error: matchesError } = await supabase
         .from("matches")
@@ -107,7 +100,7 @@ export default function MatchesPage({ user }) {
         .eq("id_grupo", activeGroup.id_grupo) 
         .eq("is_hidden", false)
         .eq("is_spectator", false)
-        .eq("is_disabled", false) // <--- REGRA NOVA AQUI: Bloqueia jogadores desativados!
+        .eq("is_disabled", false) 
         .neq("player_id", 1);
 
       if (membrosError) {
@@ -223,14 +216,13 @@ export default function MatchesPage({ user }) {
       return;
     }
 
-    // Busca apenas os membros ATIVOS para inserir na partida como "sem resposta"
     const { data: membrosData, error: membrosError } = await supabase
       .from("grupo_membros")
       .select("player_id")
       .eq("id_grupo", activeGroup.id_grupo) 
       .eq("is_hidden", false)
       .eq("is_spectator", false)
-      .eq("is_disabled", false) // Impede que o jogador inativo seja inserido no novo jogo
+      .eq("is_disabled", false) 
       .neq("player_id", 1);
 
     if (membrosError) {
@@ -343,6 +335,37 @@ export default function MatchesPage({ user }) {
     }
   };
 
+  const isMatchOpen = (matchDate) => {
+    if (!matchDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const matchD = new Date(matchDate + "T00:00:00");
+    matchD.setHours(0, 0, 0, 0);
+    return matchD >= today;
+  };
+
+  const handleCopiarAvisoWhatsApp = async (matchDate) => {
+    try {
+      let dataFormatada = matchDate || "nesta semana";
+      if (matchDate && matchDate.includes("-")) {
+        dataFormatada = matchDate.split("-").reverse().join("/");
+      }
+
+      const nomePelada = activeGroup?.nome_grupo ? activeGroup.nome_grupo.toUpperCase() : "NOSSA PELADA";
+
+      let texto = `⚽ *NOVA PARTIDA: ${nomePelada}* ⚽\n`;
+      texto += `📅 *Data:* ${dataFormatada}\n\n`;
+      texto += `Atenção, craques! A lista de presença já está aberta no nosso aplicativo.\n\n`;
+      texto += `👉 Acessem o app e confirmem se vão pro jogo!`;
+
+      await navigator.clipboard.writeText(texto);
+      alert("✅ Mensagem copiada com sucesso! Agora é só abrir o grupo do WhatsApp e colar.");
+    } catch (error) {
+      console.error("Erro ao copiar a mensagem:", error);
+      alert("❌ Erro ao copiar o aviso. Verifique se o seu navegador permite acesso à área de transferência.");
+    }
+  };
+
   const playersWithStatus = players.map((p) => {
     return { ...p, status: statusMap[p.id] || "sem_resposta" };
   });
@@ -401,7 +424,7 @@ export default function MatchesPage({ user }) {
         </div>
       )}
 
-      {/* NOVO SELETOR DE PARTIDA */}
+      {/* SELETOR DE PARTIDA */}
       <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
         <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
           📅 Selecione a Partida
@@ -438,21 +461,48 @@ export default function MatchesPage({ user }) {
 
       {selectedMatch && (
         <div style={{ background: "#f8f9fa", borderRadius: "12px", padding: "5px", border: "1px solid #eee" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexWrap: "wrap", gap: "8px" }}>
-            <h3 style={{ margin: 0, color: "#333" }}>Presença</h3>
-
-            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ background: totalConfirmed >= 12 ? "#28a745" : totalConfirmed >= 10 ? "#ffc107" : "#dc3545", color: totalConfirmed >= 10 && totalConfirmed < 12 ? "black" : "white", padding: "4px 10px", borderRadius: "20px", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
-                Confirmados: {totalConfirmed}
-              </div>
-
-              {isAdmin && !selectedMatch?.is_drawn && (
-                <button onClick={() => deleteMatch(selectedMatch.id)} style={{ background: "#dc3545", color: "white", border: "none", borderRadius: "8px", padding: "5px 8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap" }}>
-                  🗑️ Excluir
+          
+          {/* CABEÇALHO DA PARTIDA (Botões e Título organizados em linhas) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "15px" }}>
+            
+            {/* LINHA SUPERIOR: Botão do WhatsApp isolado e alinhado à direita */}
+            {isAdmin && isMatchOpen(selectedMatch.date) && (
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button 
+                  onClick={() => handleCopiarAvisoWhatsApp(selectedMatch.date)} 
+                  style={{ display: "flex", alignItems: "center", gap: "6px", background: "#25D366", color: "white", border: "none", borderRadius: "8px", padding: "6px 14px", cursor: "pointer", fontWeight: "bold", fontSize: "13px", whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+                  title="Copiar aviso para o WhatsApp"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                  </svg>
+                  WhatsApp
                 </button>
-              )}
+              </div>
+            )}
+
+            {/* LINHA INFERIOR: Presença, Confirmados e Excluir */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+              <h3 style={{ margin: 0, color: "#333" }}>Presença</h3>
+
+              <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ background: totalConfirmed >= 12 ? "#28a745" : totalConfirmed >= 10 ? "#ffc107" : "#dc3545", color: totalConfirmed >= 10 && totalConfirmed < 12 ? "black" : "white", padding: "4px 10px", borderRadius: "20px", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
+                  Confirmados: {totalConfirmed}
+                </div>
+
+                {isAdmin && !selectedMatch?.is_drawn && (
+                  <button 
+                    onClick={() => deleteMatch(selectedMatch.id)} 
+                    style={{ background: "#dc3545", color: "white", border: "none", borderRadius: "8px", padding: "5px 8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap" }}
+                  >
+                    🗑️ Excluir
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+          {/* FIM DO CABEÇALHO */}
 
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {playersWithStatus.map((p) => {
