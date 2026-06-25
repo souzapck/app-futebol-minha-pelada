@@ -592,41 +592,43 @@ export default function BallVotePage({ user }) {
   };
 
 return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px" }}>
+    <div style={{ maxWidth: 700, margin: "0 auto", padding: "5px" }}>
       <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
         <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
           📅 Selecione a Partida
         </label>
         
-        {/* AQUI ESTÁ O AJUSTE DA CAIXA DE SELEÇÃO */}
-        <select value={selectedMatchId} onChange={(e) => {
-          setSelectedMatchId(e.target.value);
-          loadConfirmedPlayers(e.target.value);
-          }} 
-          style={{ 
-            width: "max-content",    /* A caixa é flexível: cresce para abraçar todo o texto */
-            minWidth: "70%",         /* Garante que a caixa não fique espremida caso o texto seja curtinho */
-            maxWidth: "100%",        /* Trava de segurança: a caixa para de crescer se encostar na borda da tela */
-            boxSizing: "border-box", /* ESSENCIAL: Garante que os 12px de padding não estourem a tela do celular */
-            padding: "12px", 
-            borderRadius: "8px", 
-            border: "1px solid #ccc", 
-            fontSize: "14px", 
-            background: "#f8f9fa", 
-            color: "#333", 
-            outline: "none", 
-            cursor: "pointer",
-            whiteSpace: "normal",    /* Permite que o texto quebre a linha de forma suave caso atinja o limite da tela */
-            wordWrap: "break-word"   
-          }}
-        >
-          <option value="">Selecione a data...</option>
-          {matches.map((m, index) => (
-            <option key={m.id} value={m.id}>
-              {m.date.split("-").reverse().join("/")} {getVotingStatusLabel(m, index)}
-            </option>
-          ))}
-        </select>
+        {/* Envolvendo em um display flex para forçar a fluidez correta no celular */}
+        <div style={{ display: "flex", width: "100%" }}>
+          <select value={selectedMatchId} onChange={(e) => {
+            setSelectedMatchId(e.target.value);
+            loadConfirmedPlayers(e.target.value);
+            }} 
+            style={{ 
+              width: "auto",               /* 1. Flexível: A caixa cresce e abraça o texto */
+              maxWidth: "100%",            /* 2. Limite: Trava no limite máximo do celular */
+              boxSizing: "border-box",     /* 3. Segurança: Impede o padding de estourar a tela */
+              padding: "12px", 
+              borderRadius: "8px", 
+              border: "1px solid #ccc", 
+              fontSize: "13px", 
+              background: "#f8f9fa", 
+              color: "#333", 
+              outline: "none", 
+              cursor: "pointer",
+              whiteSpace: "nowrap",        /* ⛔ A TRAVA MÁGICA: Proíbe terminantemente a quebra de linha! */
+              overflow: "hidden",          /* Esconde qualquer rebarba visual */
+              textOverflow: "ellipsis"     /* Se a tela do celular for microscópica, ele põe "..." em vez de quebrar */
+            }}
+          >
+            <option value="">Selecione a data...</option>
+            {matches.map((m, index) => (
+              <option key={m.id} value={m.id}>
+                {m.date.split("-").reverse().join("/")} - {getVotingStatusLabel(m, index)}
+              </option>
+            ))}
+          </select>
+        </div>
         
         <div style={{ marginTop: "10px", fontWeight: "bold", color: "#007bff" }}>{timeLeft}</div>
       </div>
