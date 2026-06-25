@@ -591,18 +591,32 @@ export default function BallVotePage({ user }) {
     );
   };
 
-  return (
+return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px" }}>
       <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
         <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
           📅 Selecione a Partida
         </label>
         
+        {/* AQUI ESTÁ O AJUSTE DA CAIXA DE SELEÇÃO */}
         <select value={selectedMatchId} onChange={(e) => {
           setSelectedMatchId(e.target.value);
           loadConfirmedPlayers(e.target.value);
           }} 
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "14px", background: "#f8f9fa", color: "#333", outline: "none", cursor: "pointer" }}
+          style={{ 
+            width: "100%", 
+            padding: "12px", 
+            borderRadius: "8px", 
+            border: "1px solid #ccc", 
+            fontSize: "14px", 
+            background: "#f8f9fa", 
+            color: "#333", 
+            outline: "none", 
+            cursor: "pointer",
+            whiteSpace: "nowrap",      /* Impede que o texto quebre para a linha de baixo */
+            textOverflow: "ellipsis",  /* Coloca "..." se a tela for menor que o texto */
+            overflow: "hidden"         /* Corta o que sobrar em vez de alargar a tela inteira */
+          }}
         >
           <option value="">Selecione a data...</option>
           {matches.map((m, index) => (
@@ -611,6 +625,7 @@ export default function BallVotePage({ user }) {
             </option>
           ))}
         </select>
+        
         <div style={{ marginTop: "10px", fontWeight: "bold", color: "#007bff" }}>{timeLeft}</div>
       </div>
 
