@@ -592,7 +592,7 @@ export default function BallVotePage({ user }) {
   };
 
 return (
-    <div style={{ maxWidth: 700, margin: "0 auto", padding: "5px" }}>
+    <div style={{ maxWidth: 600, margin: "0 auto", padding: "10px" }}>
       <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
         <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
           📅 Selecione a Partida
@@ -605,26 +605,29 @@ return (
             loadConfirmedPlayers(e.target.value);
             }} 
             style={{ 
-              width: "auto",               /* 1. Flexível: A caixa cresce e abraça o texto */
-              maxWidth: "100%",            /* 2. Limite: Trava no limite máximo do celular */
-              boxSizing: "border-box",     /* 3. Segurança: Impede o padding de estourar a tela */
-              padding: "12px", 
+              width: "100%",           
+              padding: "10px 30px 10px 10px", /* O 30px na direita empurra o texto para não bater na setinha */
               borderRadius: "8px", 
               border: "1px solid #ccc", 
-              fontSize: "13px", 
-              background: "#f8f9fa", 
+              fontSize: "14px",        
+              backgroundColor: "#f8f9fa", 
               color: "#333", 
               outline: "none", 
               cursor: "pointer",
-              whiteSpace: "nowrap",        /* ⛔ A TRAVA MÁGICA: Proíbe terminantemente a quebra de linha! */
-              overflow: "hidden",          /* Esconde qualquer rebarba visual */
-              textOverflow: "ellipsis"     /* Se a tela do celular for microscópica, ele põe "..." em vez de quebrar */
+              fontWeight: "500",
+              /* ⛔ A MÁGICA DO IPHONE COMEÇA AQUI */
+              WebkitAppearance: "none", 
+              appearance: "none",
+              /* Como tiramos o visual da Apple, desenhamos a nossa própria setinha para baixo */
+              backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="%23333" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>')`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 8px center"
             }}
           >
             <option value="">Selecione a data...</option>
             {matches.map((m, index) => (
               <option key={m.id} value={m.id}>
-                {m.date.split("-").reverse().join("/")} - {getVotingStatusLabel(m, index)}
+                {m.date.split("-").reverse().join("/")} {getVotingStatusLabel(m, index)}
               </option>
             ))}
           </select>
