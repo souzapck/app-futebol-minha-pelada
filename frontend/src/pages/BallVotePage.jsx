@@ -604,7 +604,10 @@ return (
           loadConfirmedPlayers(e.target.value);
           }} 
           style={{ 
-            width: "100%", 
+            width: "max-content",    /* A caixa é flexível: cresce para abraçar todo o texto */
+            minWidth: "70%",         /* Garante que a caixa não fique espremida caso o texto seja curtinho */
+            maxWidth: "100%",        /* Trava de segurança: a caixa para de crescer se encostar na borda da tela */
+            boxSizing: "border-box", /* ESSENCIAL: Garante que os 12px de padding não estourem a tela do celular */
             padding: "12px", 
             borderRadius: "8px", 
             border: "1px solid #ccc", 
@@ -613,9 +616,8 @@ return (
             color: "#333", 
             outline: "none", 
             cursor: "pointer",
-            whiteSpace: "nowrap",      /* Impede que o texto quebre para a linha de baixo */
-            textOverflow: "ellipsis",  /* Coloca "..." se a tela for menor que o texto */
-            overflow: "hidden"         /* Corta o que sobrar em vez de alargar a tela inteira */
+            whiteSpace: "normal",    /* Permite que o texto quebre a linha de forma suave caso atinja o limite da tela */
+            wordWrap: "break-word"   
           }}
         >
           <option value="">Selecione a data...</option>
