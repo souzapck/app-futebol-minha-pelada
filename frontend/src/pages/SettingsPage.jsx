@@ -2,6 +2,7 @@ import { useState } from "react";
 import GroupSettingsPage from "./GroupSettingsPage.jsx";
 import PointsSettingsPage from "./PointsSettingsPage";
 import VotingSettingsPage from "./VotingSettingsPage";
+import FinanceSettingsPage from "./FinanceSettingsPage";
 
 export default function SettingsPage() {
   const [subView, setSubView] = useState("group");
@@ -30,6 +31,21 @@ export default function SettingsPage() {
           }}
         >
           ⚙️ Grupo
+        </button>
+
+        <button
+          onClick={() => setSubView("finance")}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "20px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold",
+            background: subView === "finance" ? "#007bff" : "#eee",
+            color: subView === "finance" ? "white" : "#333"
+          }}
+        >
+          🏦 Tesouraria
         </button>
 
         <button
@@ -63,6 +79,7 @@ export default function SettingsPage() {
         </button>
       </div>
       {subView === "group" && <GroupSettingsPage />}
+      {subView === "finance" && <FinanceSettingsPage />}
       {subView === "points" && <PointsSettingsPage />}
       {subView === "voting" && <VotingSettingsPage />}
     </div>

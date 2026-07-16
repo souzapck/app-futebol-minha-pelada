@@ -82,7 +82,6 @@ export default function PlayersPage({ user }) {
 
     const phoneNormalizado = newForm.phone ? normalizePhone(newForm.phone) : null;
 
-    // === VALIDAÇÃO: Mensalista OBRIGA o telefone. Convidado não. ===
     if (newForm.tipo_jogador === "Mensalista" && (!phoneNormalizado || phoneNormalizado.length !== 11)) {
       alert("❌ O Mensalista deve obrigatoriamente ter o WhatsApp cadastrado (11 dígitos).");
       return;
@@ -94,13 +93,11 @@ export default function PlayersPage({ user }) {
 
     let finalPlayerId = null;
 
-    // 1. Busca se já existe globalmente pelo telefone
     if (phoneNormalizado) {
       const { data: existingPlayer } = await supabase.from("players").select("id, name").eq("phone", phoneNormalizado).maybeSingle();
       if (existingPlayer) finalPlayerId = existingPlayer.id;
     }
 
-    // 2. Se não existir, cria o cadastro global
     if (!finalPlayerId) {
       const { data: createdPlayer, error: insertError } = await supabase
         .from("players")
@@ -116,14 +113,12 @@ export default function PlayersPage({ user }) {
       
       if (createdPlayer) finalPlayerId = createdPlayer.id;
 
-      // Cria a senha de acesso SOMENTE se tiver telefone
       if (phoneNormalizado && finalPlayerId) {
         const senhaPadrao = phoneNormalizado.slice(-4);
         await supabase.from("users").insert({ phone: phoneNormalizado, password: senhaPadrao, player_id: finalPlayerId, is_admin: false });
       }
     }
 
-    // 3. Salva o Vínculo no Grupo (Com os novos campos)
     if (finalPlayerId) {
       const payloadMembros = {
         perfil: newForm.is_spectator ? 'espectador' : 'jogador',
@@ -134,6 +129,7 @@ export default function PlayersPage({ user }) {
         tipo_jogador: newForm.tipo_jogador,
         is_disabled: newForm.is_disabled,
         is_hidden: false
+        // Ao CRIAR um usuário pela primeira vez, o próprio banco de dados já injetará a data_inclusao automaticamente.
       };
 
       const { data: jaVinculado } = await supabase.from("grupo_membros").select("player_id").eq("id_grupo", activeGroup.id_grupo).eq("player_id", finalPlayerId).maybeSingle();
@@ -157,7 +153,6 @@ export default function PlayersPage({ user }) {
 
     const phoneNormalizado = editForm.phone ? normalizePhone(editForm.phone) : null;
     
-    // === VALIDAÇÃO NA EDIÇÃO ===
     if (editForm.tipo_jogador === "Mensalista" && (!phoneNormalizado || phoneNormalizado.length !== 11)) {
         alert("❌ O Mensalista deve obrigatoriamente ter o WhatsApp cadastrado.");
         return;
@@ -167,16 +162,27 @@ export default function PlayersPage({ user }) {
         return;
     }
 
-    // Unificação de WhatsApp (Apenas se preencheu)
     if (phoneNormalizado && phoneNormalizado.length === 11) {
        const { error: mergeError } = await supabase.rpc("mesclar_jogador_por_telefone", { p_ghost_id: playerId, p_phone: phoneNormalizado });
        if (mergeError) alert("❌ Erro ao tentar unificar o WhatsApp do jogador.");
     }
 
-    // 1. Atualiza Nome Global
     await supabase.from("players").update({ name: editForm.name }).eq("id", playerId);
 
-    // 2. Atualiza Estatísticas e Status da Pelada (Com os novos campos)
+    // === LÓGICA DE DATA DE DESATIVAÇÃO (Para o Financeiro) ===
+    // Verifica qual era o status original do jogador antes de salvar
+    const jogadorAntigo = players.find(p => p.id === playerId);
+    let novaDataDesativacao = undefined; // Undefined significa "não mexa nisso por padrão"
+
+    // Se ele ERA ATIVO e agora está sendo DESATIVADO, grava a hora atual!
+    if (!jogadorAntigo.is_disabled && editForm.is_disabled) {
+      novaDataDesativacao = new Date().toISOString();
+    } 
+    // Se ele ERA DESATIVADO e agora está sendo REATIVADO, limpa a data!
+    else if (jogadorAntigo.is_disabled && !editForm.is_disabled) {
+      novaDataDesativacao = null;
+    }
+
     const payloadMembros = {
       position: editForm.is_spectator ? null : editForm.position,
       rating: editForm.is_spectator ? null : editForm.rating,
@@ -186,15 +192,18 @@ export default function PlayersPage({ user }) {
       is_disabled: editForm.is_disabled
     };
 
+    // Só adiciona a coluna no update se houver mudança de status
+    if (novaDataDesativacao !== undefined) {
+      payloadMembros.data_desativacao = novaDataDesativacao;
+    }
+
     await supabase.from("grupo_membros").update(payloadMembros).eq("id_grupo", activeGroup.id_grupo).eq("player_id", playerId);
 
     setEditingId(null);
     setTimeout(() => { loadPlayers(); }, 500); 
   };
 
-  // Funções Auxiliares: ToggleAdmin e ResetarSenha (Mantidas inalteradas)
   const toggleAdmin = async (jogadorId) => {
-    /* ... seu código intacto ... */
     const confirma = window.confirm("Deseja dar ou retirar o acesso de Administrador deste jogador?");
     if (!confirma) return;
     try {
@@ -218,7 +227,6 @@ export default function PlayersPage({ user }) {
   };
 
   const resetarSenha = async (jogadorId, nomeJogador) => {
-    /* ... seu código intacto ... */
     const novaSenha = window.prompt(`🔄 Digite a nova senha provisória para ${nomeJogador}:`);
     if (!novaSenha) return;
     if (!/^\d{4}$/.test(novaSenha)) return alert("❌ A senha deve ter exatamente 4 dígitos numéricos.");
@@ -258,7 +266,6 @@ export default function PlayersPage({ user }) {
     setEditForm({});
   };
 
-  // Ordena primeiro os Ativos, depois os Inativos. Dentro de cada grupo, ordena por Nome.
   const jogadoresOrdenados = [...players].sort((a, b) => {
     if (a.is_disabled !== b.is_disabled) return a.is_disabled ? 1 : -1;
     if (a.id === user?.player_id) return -1;
@@ -282,7 +289,6 @@ export default function PlayersPage({ user }) {
           <h3 style={{ marginTop: 0, color: "#007bff" }}>👥 Novo Jogador</h3>
           <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             
-            {/* === NOVA LINHA: TIPO DE JOGADOR === */}
             <div style={{ marginBottom: "5px" }}>
                <span style={{ display: "block", color: "#374151", fontSize: "12px", marginBottom: "4px", fontWeight: "bold" }}>Tipo de Jogador *</span>
                <select 
@@ -368,7 +374,6 @@ export default function PlayersPage({ user }) {
                       {p.is_disabled && <span style={{ fontSize: "10px", background: "#dc3545", color: "#fff", padding: "2px 6px", borderRadius: "4px" }}>DESATIVADO</span>}
                     </div>
 
-                    {/* BADGE TIPO DE JOGADOR */}
                     <div style={{ marginTop: "4px", marginBottom: "4px" }}>
                        <span style={{ fontSize: "10px", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px", background: p.tipo_jogador === "Mensalista" ? "#e0f2fe" : "#fef3c7", color: p.tipo_jogador === "Mensalista" ? "#0369a1" : "#b45309" }}>
                          {p.tipo_jogador.toUpperCase()}
