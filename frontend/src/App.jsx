@@ -18,7 +18,7 @@ import "./App.css";
 import { supabase } from "./supabaseClient";
 
 function AppContent() {
-  const [view, setView] = useState("home");  // Aqui define qual a página inicial ao logar no app.
+  const [view, setView] = useState("home");  // Aqui define qual a página inicial ao logar no app .
   const [user, setUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   
