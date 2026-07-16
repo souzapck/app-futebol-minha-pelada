@@ -10,6 +10,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import VotingPage from "./pages/VotingPage.jsx";
 import CreateGroupPage from "./pages/CreateGroupPage.jsx";
 import GroupSelectionPage from "./pages/GroupSelectionPage.jsx";
+import FinancePage from "./pages/FinancePage.jsx";
 import { GroupProvider, useGroup } from "./contexts/GroupContext";
 
 import "./App.css";
@@ -25,9 +26,12 @@ function AppContent() {
   const [supportMessage, setSupportMessage] = useState("");
   const [sendingSupport, setSendingSupport] = useState(false);
 
-  // === ESTADOS PARA A BARRA DE NAVEGAÇÃO MINIMIZADA ===
+  // === ESTADOS PARA A BARRA DE NAVEGAÇÃO ===
   const [isNavMinimized, setIsNavMinimized] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  // === ESTADO DA BOLINHA DE INADIMPLÊNCIA ===
+  const [hasOverdue, setHasOverdue] = useState(false);
 
   const { activeGroup, changeGroup, clearGroup, isAdmin } = useGroup();
 
@@ -112,6 +116,69 @@ function AppContent() {
     };
   }, [user]);
 
+  // === MOTOR INVISÍVEL: Verifica se o jogador tem dívida atrasada ===
+  useEffect(() => {
+    const checkDebts = async () => {
+      if (!activeGroup || !user) return;
+
+      // 👉 TRAVA 1: Permissão de Visibilidade. Se o módulo está desligado OU o jogador atual não tem permissão para ver a tesouraria, desliga a bolinha.
+      const moduloTesourariaAtivo = activeGroup.usa_tesouraria !== false;
+      const jogadorPedeVerTesouraria = activeGroup.jogadores_veem_tesouraria !== false;
+      const podeVerTesouraria = moduloTesourariaAtivo && (isAdmin || jogadorPedeVerTesouraria);
+
+      if (!podeVerTesouraria) {
+        setHasOverdue(false);
+        return;
+      }
+
+      // 👉 TRAVA 2: DO SUPER ADMIN: Ignora completamente se for o usuário principal
+      if (Number(user.player_id) === 1) {
+        setHasOverdue(false);
+        return;
+      }
+
+      const { data: config } = await supabase.from("grupos_pelada").select("mes_inicio_tesouraria, dia_vencimento_tesouraria").eq("id_grupo", activeGroup.id_grupo).single();
+      const { data: member } = await supabase.from("grupo_membros").select("tipo_jogador, data_inclusao, data_desativacao").eq("id_grupo", activeGroup.id_grupo).eq("player_id", user.player_id).single();
+      
+      if (!member || member.tipo_jogador?.toLowerCase() !== "mensalista") return setHasOverdue(false);
+
+      const { data: payments } = await supabase.from("mensalidades").select("mes_ano").eq("id_grupo", activeGroup.id_grupo).eq("player_id", user.player_id).in("status", ["pago", "isento"]);
+
+      const paidMonths = payments ? payments.map(p => p.mes_ano) : [];
+      const startLimit = config?.mes_inicio_tesouraria || "2024-01";
+      const dueDay = config?.dia_vencimento_tesouraria || 10;
+      
+      const today = new Date();
+      let hasDebt = false;
+
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const limitDate = new Date(Number(startLimit.split('-')[0]), Number(startLimit.split('-')[1]) - 1, 1);
+        if (d < limitDate) break;
+
+        const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        
+        const inclusao = member.data_inclusao ? new Date(member.data_inclusao) : new Date("2000-01-01");
+        const desativacao = member.data_desativacao ? new Date(member.data_desativacao) : null;
+        const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+        
+        if (inclusao > monthEnd) continue;
+        if (desativacao && desativacao < d) continue;
+
+        if (!paidMonths.includes(monthStr)) {
+           const dueDate = new Date(d.getFullYear(), d.getMonth(), dueDay, 23, 59, 59);
+           if (today > dueDate) {
+             hasDebt = true; 
+             break;
+           }
+        }
+      }
+      setHasOverdue(hasDebt);
+    };
+
+    checkDebts();
+  }, [activeGroup, user, view, isAdmin]); // Incluí o isAdmin nas dependências para reagir rapidamente a mudanças de privilégio
+
   useEffect(() => {
     const handleClickOutside = () => setShowUserMenu(false);
     if (showUserMenu) window.addEventListener("click", handleClickOutside);
@@ -121,15 +188,12 @@ function AppContent() {
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      
       if (currentScrollY > lastScrollY && currentScrollY > 50) {
         setIsNavMinimized(true);
         setShowUserMenu(false);
-      } 
-      else if (currentScrollY < lastScrollY) {
+      } else if (currentScrollY < lastScrollY) {
         setIsNavMinimized(false);
       }
-      
       setLastScrollY(currentScrollY);
     };
 
@@ -140,9 +204,7 @@ function AppContent() {
   useEffect(() => {
     if (user && !activeGroup) {
       const grupos = user.user_groups || [];
-      if (grupos.length === 1) {
-        changeGroup(grupos[0]);
-      }
+      if (grupos.length === 1) changeGroup(grupos[0]);
     }
   }, [user, activeGroup, changeGroup]);
 
@@ -156,11 +218,7 @@ function AppContent() {
     }
 
     try {
-      const { error } = await supabase
-        .from("users")
-        .update({ password: novaSenha })
-        .eq("player_id", user.player_id);
-
+      const { error } = await supabase.from("users").update({ password: novaSenha }).eq("player_id", user.player_id);
       if (error) throw error;
       alert("✅ Senha alterada com sucesso!");
     } catch (e) {
@@ -194,25 +252,17 @@ function AppContent() {
     setSendingSupport(true);
     try {
       let telefone = user?.players?.phone || user?.phone;
-      
       if (!telefone) {
-        const { data: playerData } = await supabase
-          .from("players")
-          .select("phone")
-          .eq("id", user.player_id)
-          .maybeSingle();
-          
+        const { data: playerData } = await supabase.from("players").select("phone").eq("id", user.player_id).maybeSingle();
         telefone = playerData?.phone || "Sem contato";
       }
 
-      const { error } = await supabase
-        .from("suporte_mensagens")
-        .insert([{
-          id_grupo: activeGroup?.id_grupo,
-          nome_usuario: user?.players?.name || user?.name || "Desconhecido",
-          telefone_usuario: telefone,
-          mensagem: supportMessage.trim()
-        }]);
+      const { error } = await supabase.from("suporte_mensagens").insert([{
+        id_grupo: activeGroup?.id_grupo,
+        nome_usuario: user?.players?.name || user?.name || "Desconhecido",
+        telefone_usuario: telefone,
+        mensagem: supportMessage.trim()
+      }]);
 
       if (error) throw error;
 
@@ -240,15 +290,8 @@ function AppContent() {
 
   if (!activeGroup) {
     const grupos = user.user_groups || [];
-
-    if (grupos.length === 0) {
-      return <CreateGroupPage user={user} />;
-    }
-
-    if (grupos.length > 1) {
-      return <GroupSelectionPage user={user} onGroupSelected={() => {}} />;
-    }
-
+    if (grupos.length === 0) return <CreateGroupPage user={user} />;
+    if (grupos.length > 1) return <GroupSelectionPage user={user} onGroupSelected={() => {}} />;
     return <div style={{ textAlign: "center", marginTop: "50px", fontFamily: "Arial, sans-serif" }}>Entrando no Vestiário...</div>;
   }
 
@@ -275,7 +318,6 @@ function AppContent() {
 
   const temVideo = activeGroup?.url_videos_pelada && activeGroup.url_videos_pelada.trim() !== "";
 
-  // ESTILO PADRÃO DOS CABEÇALHOS DO MENU (Alinhado à direita e com maior contraste)
   const menuHeaderStyle = {
     padding: "8px 14px", 
     background: "#e2e6ea", 
@@ -287,38 +329,27 @@ function AppContent() {
     textTransform: "uppercase"
   };
 
+  const moduloTesourariaAtivo = activeGroup?.usa_tesouraria !== false;
+  const jogadorPedeVerTesouraria = activeGroup?.jogadores_veem_tesouraria !== false;
+  const mostrarBotaoTesouraria = moduloTesourariaAtivo && (isAdmin || jogadorPedeVerTesouraria);
+
   return (
     <div style={{ padding: "85px 20px 100px 20px", maxWidth: "600px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       
       <div
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          background: "#ffffff",
-          borderBottom: "1px solid #eee",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
-          zIndex: 1000,
-          paddingTop: "calc(env(safe-area-inset-top) + 4px)"
+          position: "fixed", top: 0, left: 0, right: 0, background: "#ffffff",
+          borderBottom: "1px solid #eee", boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
+          zIndex: 1000, paddingTop: "calc(env(safe-area-inset-top) + 4px)"
         }}
       >
         <div style={{ maxWidth: "600px", margin: "0 auto", display: "flex", alignItems: "center", height: "60px", padding: "0 15px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#f8f9fa", padding: "6px 16px", borderRadius: "24px", width: "fit-content", border: "1px solid #f0f0f0" }}>
-            <div
-              style={{
-                background: "#007bff", color: "white", width: "35px", height: "35px",
-                borderRadius: "50%", display: "flex", alignItems: "center",
-                justifyContent: "center", fontWeight: "bold", fontSize: "16px", overflow: "hidden"
-              }}
-            >
+            <div style={{ background: "#007bff", color: "white", width: "35px", height: "35px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "16px", overflow: "hidden" }}>
               {user?.players?.name?.charAt(0)}
             </div>
-
             <div style={{ textAlign: "left" }}>
-              <div style={{ fontWeight: "bold", color: "#333", fontSize: "14px", lineHeight: "1.2" }}>
-                {user?.players?.name}
-              </div>
+              <div style={{ fontWeight: "bold", color: "#333", fontSize: "14px", lineHeight: "1.2" }}>{user?.players?.name}</div>
               <div style={{ fontSize: "11px", color: isAdmin ? "#dc3545" : "#888", fontWeight: isAdmin ? "bold" : "normal" }}>
                 {isAdmin ? "🔑 Administrador" : "⚽ Jogador"} | {activeGroup?.nome_grupo}
               </div>
@@ -328,10 +359,7 @@ function AppContent() {
       </div>
 
       <div style={{ display: "flex", justifyContent: "center", marginBottom: "25px" }}>
-        <img 
-          src={activeGroup?.logo_url || "/logo-app.webp"} 
-          alt={`Escudo da pelada ${activeGroup?.nome_grupo || ''}`}          
-          style={{ width: "140px", height: "auto", objectFit: "contain", borderRadius: "10px" }} />
+        <img src={activeGroup?.logo_url || "/logo-app.webp"} alt={`Escudo da pelada ${activeGroup?.nome_grupo || ''}`} style={{ width: "140px", height: "auto", objectFit: "contain", borderRadius: "10px" }} />
       </div>
 
       <main>
@@ -343,30 +371,18 @@ function AppContent() {
         {view === "teams" && <TeamsPage user={user} />}
         {view === "voting" && <VotingPage user={user} />}
         {view === "ranking" && <RankingPage />}
+        {view === "finance" && <FinancePage user={user} />}
       </main>
 
       <div
         onClick={() => setIsNavMinimized(false)}
         style={{
-          position: "fixed",
-          bottom: isNavMinimized ? "calc(env(safe-area-inset-bottom) + 15px)" : "-60px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "rgba(0, 0, 0, 0.8)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          color: "#fff",
-          padding: "10px 24px",
-          borderRadius: "30px",
-          fontSize: "13px",
-          fontWeight: "bold",
-          boxShadow: "0 6px 16px rgba(0,0,0,0.3)",
-          zIndex: 1001,
-          cursor: "pointer",
-          transition: "bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px"
+          position: "fixed", bottom: isNavMinimized ? "calc(env(safe-area-inset-bottom) + 15px)" : "-60px",
+          left: "50%", transform: "translateX(-50%)", background: "rgba(0, 0, 0, 0.8)",
+          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff",
+          padding: "10px 24px", borderRadius: "30px", fontSize: "13px", fontWeight: "bold",
+          boxShadow: "0 6px 16px rgba(0,0,0,0.3)", zIndex: 1001, cursor: "pointer",
+          transition: "bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1)", display: "flex", alignItems: "center", gap: "8px"
         }}
       >
         <span style={{ fontSize: "16px" }}>👆</span> Menu
@@ -374,14 +390,8 @@ function AppContent() {
 
       <div 
         style={{ 
-          position: "fixed", 
-          bottom: 0, 
-          left: 0, 
-          right: 0, 
-          background: "#ffffff", 
-          borderTop: "1px solid #eee", 
-          boxShadow: "0 -3px 12px rgba(0,0,0,0.08)", 
-          zIndex: 1000, 
+          position: "fixed", bottom: 0, left: 0, right: 0, background: "#ffffff", 
+          borderTop: "1px solid #eee", boxShadow: "0 -3px 12px rgba(0,0,0,0.08)", zIndex: 1000, 
           paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)",
           transform: isNavMinimized ? "translateY(100%)" : "translateY(0)",
           transition: "transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)"
@@ -409,12 +419,16 @@ function AppContent() {
             <span style={{ fontSize: "10px", marginTop: "3px" }}>Ranking</span>
           </button>
 
-          <button onClick={(e) => { e.stopPropagation(); setShowUserMenu(!showUserMenu); renovarSessao(); }} style={tabButtonStyle(isMenuView || showUserMenu, true)}>
+          {/* === BOTÃO DE MENU COM BOLINHA VERMELHA === */}
+          <button 
+            onClick={(e) => { e.stopPropagation(); setShowUserMenu(!showUserMenu); renovarSessao(); }} 
+            style={{ ...tabButtonStyle(isMenuView || showUserMenu, true), position: "relative" }}
+          >
             <span style={{ fontSize: "20px" }}>☰</span>
             <span style={{ fontSize: "10px", marginTop: "3px" }}>Menu</span>
+            {hasOverdue && <div style={{ position: "absolute", top: "5px", right: "15px", width: "10px", height: "10px", background: "#dc3545", borderRadius: "50%", border: "2px solid #fff" }}></div>}
           </button>
 
-          {/* MENU FLUTUANTE DE OPÇÕES */}
           {showUserMenu && (
             <div
               onClick={(e) => e.stopPropagation()}
@@ -427,12 +441,7 @@ function AppContent() {
               {temVideo && (
                 <>
                   <div style={menuHeaderStyle}>Vídeos da Pelada</div>
-                  <button 
-                    onClick={() => { setShowUserMenu(false); window.open(activeGroup.url_videos_pelada, "_blank"); }} 
-                    style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#333", borderBottom: "1px solid #f5f5f5" }}
-                  >
-                    🎥 Ixpia seu lance
-                  </button>
+                  <button onClick={() => { setShowUserMenu(false); window.open(activeGroup.url_videos_pelada, "_blank"); }} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#333", borderBottom: "1px solid #f5f5f5" }}>🎥 Ixpia seu lance</button>
                 </>
               )}
 
@@ -452,6 +461,19 @@ function AppContent() {
                 </>
               )}
 
+              {mostrarBotaoTesouraria && (
+                <>
+                  <div style={menuHeaderStyle}>Tesouraria</div>
+                  <button 
+                    onClick={() => handleChangeView("finance")} 
+                    style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: view === "finance" ? "#007bff" : "#333", borderBottom: "1px solid #f5f5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                  >
+                    <span>💰 Pagamentos e PIX</span>
+                    {hasOverdue && <span style={{ background: "#dc3545", color: "white", borderRadius: "10px", padding: "2px 6px", fontSize: "10px" }}>Atrasado</span>}
+                  </button>
+                </>
+              )}
+
               <div style={menuHeaderStyle}>Sua Conta</div>
               <button onClick={() => { setShowUserMenu(false); setSupportModalOpen(true); }} style={{ width: "100%", background: "#fff", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontWeight: "bold", color: "#ffc107", borderBottom: "1px solid #f5f5f5" }}>📢 Chamar Suporte</button>
 
@@ -468,37 +490,17 @@ function AppContent() {
       {supportModalOpen && (
         <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
           <div style={{ width: "100%", maxWidth: "450px", background: "#fff", borderRadius: "12px", padding: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ margin: "0 0 10px 0", color: "#333", display: "flex", alignItems: "center", gap: "8px" }}>
-              🛠️ Enviar Feedback ou Relatar Bug
-            </h3>
+            <h3 style={{ margin: "0 0 10px 0", color: "#333", display: "flex", alignItems: "center", gap: "8px" }}>🛠️ Enviar Feedback ou Relatar Bug</h3>
             <p style={{ fontSize: "12px", color: "#666", marginBottom: "15px", lineHeight: "1.4" }}>
               Encontrou um erro ou tem uma sugestão? Descreva abaixo. Sua mensagem será enviada junto com o nome do seu grupo para análise.
             </p>
 
             <form onSubmit={handleSendSupport}>
-              <textarea
-                value={supportMessage}
-                onChange={(e) => setSupportMessage(e.target.value)}
-                placeholder="Descreva detalhadamente..."
-                required
-                rows={5}
-                style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "14px", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: "15px", fontFamily: "inherit" }}
-              />
+              <textarea value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} placeholder="Descreva detalhadamente..." required rows={5} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "14px", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: "15px", fontFamily: "inherit" }} />
 
               <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                <button 
-                  type="button"
-                  onClick={() => { setSupportModalOpen(false); setSupportMessage(""); }}
-                  disabled={sendingSupport}
-                  style={{ padding: "10px 14px", background: "#6c757d", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={sendingSupport || !supportMessage.trim()}
-                  style={{ padding: "10px 14px", background: (sendingSupport || !supportMessage.trim()) ? "#ced4da" : "#007bff", color: "#fff", border: "none", borderRadius: "8px", cursor: (sendingSupport || !supportMessage.trim()) ? "not-allowed" : "pointer", fontWeight: "bold" }}
-                >
+                <button type="button" onClick={() => { setSupportModalOpen(false); setSupportMessage(""); }} disabled={sendingSupport} style={{ padding: "10px 14px", background: "#6c757d", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Cancelar</button>
+                <button type="submit" disabled={sendingSupport || !supportMessage.trim()} style={{ padding: "10px 14px", background: (sendingSupport || !supportMessage.trim()) ? "#ced4da" : "#007bff", color: "#fff", border: "none", borderRadius: "8px", cursor: (sendingSupport || !supportMessage.trim()) ? "not-allowed" : "pointer", fontWeight: "bold" }}>
                   {sendingSupport ? "Enviando..." : "🚀 Enviar"}
                 </button>
               </div>
