@@ -21,7 +21,6 @@ export default function BallVotePage({ user }) {
   const [timeLeft, setTimeLeft] = useState("");
   const [isVotingOpen, setIsVotingOpen] = useState(false);
   
-  // Máquina de estado para controlar as fases da votação
   const [votingPhase, setVotingPhase] = useState("WAITING"); // WAITING | T1 | INTERVAL | T2 | CLOSED
   const [loadingVote, setLoadingVote] = useState(false);
 
@@ -123,6 +122,7 @@ export default function BallVotePage({ user }) {
     }
   }, [selectedMatchId, user?.player_id, currentRound]); 
 
+  // === MÁQUINA DE ESTADO & CRONÔMETRO ===
   useEffect(() => {
     if (!selectedMatchId || matches.length === 0) return;
     const match = matches.find(m => String(m.id) === String(selectedMatchId));
@@ -130,6 +130,18 @@ export default function BallVotePage({ user }) {
 
     const updateTimer = () => {
       const isLatestMatch = matches.length > 0 && match.id === matches[0].id;
+
+      // 🛑 TRAVAS INDIVIDUAIS DE CONFIGURAÇÃO DO GRUPO
+      const isCheiaAtiva = activeGroup?.pt_bola_cheia_ativo !== false;
+      const isMurchaAtiva = activeGroup?.pt_bola_murcha_ativo !== false;
+
+      // Se AMBOS os parâmetros estiverem desativados E for a partida atual
+      if (!isCheiaAtiva && !isMurchaAtiva && isLatestMatch) {
+        setTimeLeft("🚫 Votação desativada nas configurações.");
+        setIsVotingOpen(false);
+        setVotingPhase("CLOSED");
+        return;
+      }
 
       if (!isLatestMatch) {
         setTimeLeft("Votação encerrada (Partida Anterior).");
@@ -210,8 +222,14 @@ export default function BallVotePage({ user }) {
 
   // === CALCULA O STATUS DA VOTAÇÃO PARA O DROPDOWN ===
   const getVotingStatusLabel = (match, index) => {
+    const isCheiaAtiva = activeGroup?.pt_bola_cheia_ativo !== false;
+    const isMurchaAtiva = activeGroup?.pt_bola_murcha_ativo !== false;
+    
+    // Mostra aviso visual no dropdown se tudo estiver desligado (apenas para o jogo atual)
+    if (!isCheiaAtiva && !isMurchaAtiva && index === 0) return "🚫 Desativada";
+
     if (index !== 0) return "🔒 Encerrada"; 
-    if (!match.is_drawn) return "⏳ Aguardando jogo";
+    if (!match.is_drawn) return "⏳ Aguardando";
 
     const now = new Date();
     const horaCrua = activeGroup?.hora_jogo_grupo || "22:30:00"; 
@@ -247,8 +265,12 @@ export default function BallVotePage({ user }) {
   const handleSaveVote = async () => {
     if (loadingVote) return; 
 
-    const needsCheia = currentRound === 1 || runoffCandidates.cheia.length > 1;
-    const needsMurcha = currentRound === 1 || runoffCandidates.murcha.length > 1;
+    const isCheiaAtiva = activeGroup?.pt_bola_cheia_ativo !== false;
+    const isMurchaAtiva = activeGroup?.pt_bola_murcha_ativo !== false;
+
+    // A validação de preenchimento obrigatório só acontece se a categoria estiver ATIVA
+    const needsCheia = isCheiaAtiva && (currentRound === 1 || runoffCandidates.cheia.length > 1);
+    const needsMurcha = isMurchaAtiva && (currentRound === 1 || runoffCandidates.murcha.length > 1);
 
     if (needsCheia && !bolaCheiaId) return alert("Selecione o Bola Cheia!");
     if (needsMurcha && !bolaMurchaId) return alert("Selecione o Bola Murcha!");
@@ -262,6 +284,7 @@ export default function BallVotePage({ user }) {
         id_grupo: activeGroup.id_grupo, 
         match_id: selectedMatchId,
         voter_player_id: user.player_id,
+        // Injeta NULL na categoria que estiver desativada pelo administrador
         bola_cheia_player_id: needsCheia ? bolaCheiaId : null,
         bola_murcha_player_id: needsMurcha ? bolaMurchaId : null,
         round: currentRound
@@ -302,8 +325,11 @@ export default function BallVotePage({ user }) {
 
     const selectedMatch = matches.find(m => String(m.id) === String(selectedMatchId));
 
-    const needsCheia = round === 1 || runoffCandidates.cheia.length > 1;
-    const needsMurcha = round === 1 || runoffCandidates.murcha.length > 1;
+    const isCheiaAtiva = activeGroup?.pt_bola_cheia_ativo !== false;
+    const isMurchaAtiva = activeGroup?.pt_bola_murcha_ativo !== false;
+
+    const needsCheia = isCheiaAtiva && (round === 1 || runoffCandidates.cheia.length > 1);
+    const needsMurcha = isMurchaAtiva && (round === 1 || runoffCandidates.murcha.length > 1);
 
     const canSubmit = canVote && (!needsCheia || bolaCheiaId) && (!needsMurcha || bolaMurchaId) && !loadingVote;
 
@@ -337,8 +363,9 @@ export default function BallVotePage({ user }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {sortedPlayers.map((p, index) => {
-              const canCheia = round === 1 || runoffCandidates.cheia.includes(p.id);
-              const canMurcha = round === 1 || runoffCandidates.murcha.includes(p.id);
+              // Só renderiza o botão se a categoria estiver ATIVA e o jogador for elegível (Turno 1 ou Desempate)
+              const canCheia = isCheiaAtiva && (round === 1 || runoffCandidates.cheia.includes(p.id));
+              const canMurcha = isMurchaAtiva && (round === 1 || runoffCandidates.murcha.includes(p.id));
               
               if (!canCheia && !canMurcha) return null;
 
@@ -432,6 +459,7 @@ export default function BallVotePage({ user }) {
     const votesT1 = allVotes.filter(v => v.round === 1);
     const votesT2 = allVotes.filter(v => v.round === 2);
 
+    // Os resultados não devem ser ocultos por configurações recentes para proteger o HISTÓRICO
     const showCheia = round === 1 || runoffCandidates.cheia.length > 1;
     const showMurcha = round === 1 || runoffCandidates.murcha.length > 1;
 
@@ -459,7 +487,6 @@ export default function BallVotePage({ user }) {
         });
     };
 
-    // AQUI O CARD DE RESUMO MOSTRA A REALIDADE EXATA DAQUELE TURNO (SE NÃO HOUVE VOTOS, FICA VAZIO)
     if (showCheia) rankingCheia = processRanking('C', round === 2 ? votesT2 : votesT1);
     if (showMurcha) rankingMurcha = processRanking('M', round === 2 ? votesT2 : votesT1);
 
@@ -472,20 +499,20 @@ export default function BallVotePage({ user }) {
     vencedoresC = getWinners(rankingCheia);
     vencedoresM = getWinners(rankingMurcha);
 
-    const gridColumns = (showCheia && showMurcha) ? "1fr 1fr" : "1fr";
+    const gridColumns = (rankingCheia.length > 0 && rankingMurcha.length > 0) ? "1fr 1fr" : "1fr";
 
     return (
       <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", border: "1px solid #e0e0e0", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", marginBottom: "20px" }}>
         <h3 style={{ margin: "0 0 20px 0", textAlign: "center", color: "#333", borderBottom: "2px solid #f0f0f0", paddingBottom: "10px" }}>{title}</h3>
 
-        {(!showCheia || rankingCheia.length === 0) && (!showMurcha || rankingMurcha.length === 0) ? (
+        {rankingCheia.length === 0 && rankingMurcha.length === 0 ? (
           <div style={{ background: "#f8f9fa", border: "1px solid #e9ecef", borderRadius: "10px", padding: "12px", textAlign: "center", color: "#777", fontSize: "14px" }}>
             Nenhum voto registrado.
           </div>
         ) : (
           <>
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: "15px", marginBottom: "25px" }}>
-              {showCheia && (
+              {rankingCheia.length > 0 && (
                 <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #c3e6cb" }}>
                   <div style={{ fontSize: "10px", fontWeight: "bold", color: "#2f9e44", textTransform: "uppercase" }}>⚽ CHEIA</div>
                   {vencedoresC.map(v => (
@@ -494,7 +521,7 @@ export default function BallVotePage({ user }) {
                 </div>
               )}
 
-              {showMurcha && (
+              {rankingMurcha.length > 0 && (
                 <div style={{ background: "#fff5f5", padding: "15px", borderRadius: "12px", textAlign: "center", border: "1px solid #f5c6cb" }}>
                   <div style={{ fontSize: "10px", fontWeight: "bold", color: "#e03131", textTransform: "uppercase" }}>🎈 MURCHA</div>
                   {vencedoresM.map(v => (
@@ -505,7 +532,7 @@ export default function BallVotePage({ user }) {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: "20px" }}>
-              {showCheia && (
+              {rankingCheia.length > 0 && (
                 <div>
                   <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
                   {rankingCheia.map(r => (
@@ -516,7 +543,7 @@ export default function BallVotePage({ user }) {
                 </div>
               )}
 
-              {showMurcha && (
+              {rankingMurcha.length > 0 && (
                 <div>
                   <p style={{ fontSize: "10px", fontWeight: "bold", color: "#888", marginBottom: "8px" }}>Votados:</p>
                   {rankingMurcha.map(r => (
@@ -552,17 +579,16 @@ export default function BallVotePage({ user }) {
       return ranking.filter(r => r.total === max);
     };
 
-    // === PROTEÇÃO DE FALLBACK APENAS PARA O PÓDIO FINAL ===
-    // Analisamos se a urna do 2º turno não ficou completamente vazia
     const votesT2 = allVotes.filter(v => v.round === 2);
     const hasT2CheiaVotes = votesT2.some(v => v.bola_cheia_player_id);
     const hasT2MurchaVotes = votesT2.some(v => v.bola_murcha_player_id);
 
-    // Se houve desempate mas NINGUÉM votou na categoria (T2 vazio), buscamos os empatados do 1º turno!
     let finalCheia = (runoffCandidates.cheia.length > 1 && hasT2CheiaVotes) ? getWinners('C', 2) : getWinners('C', 1);
     let finalMurcha = (runoffCandidates.murcha.length > 1 && hasT2MurchaVotes) ? getWinners('M', 2) : getWinners('M', 1);
 
     if (finalCheia.length === 0 && finalMurcha.length === 0) return null;
+
+    const gridColumns = (finalCheia.length > 0 && finalMurcha.length > 0) ? "1fr 1fr" : "1fr";
 
     return (
       <div style={{ background: "linear-gradient(135deg, #ffd700 0%, #ffb300 100%)", borderRadius: "16px", padding: "4px", boxShadow: "0 6px 15px rgba(255, 215, 0, 0.2)", marginBottom: "5px" }}>
@@ -571,75 +597,73 @@ export default function BallVotePage({ user }) {
             🏆 Eleitos da Rodada 🏆
           </h2>
           
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
-            <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", border: "2px solid #51cf66", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: "900", color: "#2b8a3e", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>⚽ Bola Cheia</div>
-              {finalCheia.length > 0 ? finalCheia.map(v => (
-                <div key={v.id} style={{ fontSize: "18px", fontWeight: "900", color: "#1b5e20", lineHeight: "1.2" }}>{v.name}</div>
-              )) : <div style={{color: "#888", fontSize: "14px"}}>Sem votos</div>}
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: gridColumns, gap: "15px" }}>
+            {finalCheia.length > 0 && (
+              <div style={{ background: "#ebfbee", padding: "15px", borderRadius: "12px", border: "2px solid #51cf66", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ fontSize: "11px", fontWeight: "900", color: "#2b8a3e", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>⚽ Bola Cheia</div>
+                {finalCheia.map(v => (
+                  <div key={v.id} style={{ fontSize: "18px", fontWeight: "900", color: "#1b5e20", lineHeight: "1.2" }}>{v.name}</div>
+                ))}
+              </div>
+            )}
 
-            <div style={{ background: "#fff5f5", padding: "15px", borderRadius: "12px", border: "2px solid #ff8787", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <div style={{ fontSize: "11px", fontWeight: "900", color: "#c92a2a", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>🎈 Bola Murcha</div>
-              {finalMurcha.length > 0 ? finalMurcha.map(v => (
-                <div key={v.id} style={{ fontSize: "18px", fontWeight: "900", color: "#c92a2a", lineHeight: "1.2" }}>{v.name}</div>
-              )) : <div style={{color: "#888", fontSize: "14px"}}>Sem votos</div>}
-            </div>
+            {finalMurcha.length > 0 && (
+              <div style={{ background: "#fff5f5", padding: "15px", borderRadius: "12px", border: "2px solid #ff8787", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ fontSize: "11px", fontWeight: "900", color: "#c92a2a", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>🎈 Bola Murcha</div>
+                {finalMurcha.map(v => (
+                  <div key={v.id} style={{ fontSize: "18px", fontWeight: "900", color: "#c92a2a", lineHeight: "1.2" }}>{v.name}</div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
     );
   };
 
-return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: "10px" }}>
-      <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+  return (
+    <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px" }}>
+      <div style={{ background: "#fff", padding: "12px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
         <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", color: "#444", fontSize: "14px" }}>
           📅 Selecione a Partida
         </label>
         
-        {/* Envolvendo em um display flex para forçar a fluidez correta no celular */}
-        <div style={{ display: "flex", width: "100%" }}>
-          <select value={selectedMatchId} onChange={(e) => {
-            setSelectedMatchId(e.target.value);
-            loadConfirmedPlayers(e.target.value);
-            }} 
-            style={{ 
-              width: "100%",           
-              padding: "10px 30px 10px 10px", /* O 30px na direita empurra o texto para não bater na setinha */
-              borderRadius: "8px", 
-              border: "1px solid #ccc", 
-              fontSize: "14px",        
-              backgroundColor: "#f8f9fa", 
-              color: "#333", 
-              outline: "none", 
-              cursor: "pointer",
-              fontWeight: "500",
-              /* ⛔ A MÁGICA DO IPHONE COMEÇA AQUI */
-              WebkitAppearance: "none", 
-              appearance: "none",
-              /* Como tiramos o visual da Apple, desenhamos a nossa própria setinha para baixo */
-              backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="%23333" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>')`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 8px center"
-            }}
-          >
-            <option value="">Selecione a data...</option>
-            {matches.map((m, index) => (
-              <option key={m.id} value={m.id}>
-                {m.date.split("-").reverse().join("/")} {getVotingStatusLabel(m, index)}
-              </option>
-            ))}
-          </select>
-        </div>
-        
+        {/* CSS BLINDADO PARA IPHONE E GALAXY (Trava na linha com Setinha) */}
+        <select value={selectedMatchId} onChange={(e) => {
+          setSelectedMatchId(e.target.value);
+          loadConfirmedPlayers(e.target.value);
+          }} 
+          style={{ 
+            width: "100%",           
+            padding: "10px 30px 10px 10px", 
+            borderRadius: "8px", 
+            border: "1px solid #ccc", 
+            fontSize: "14px",        
+            backgroundColor: "#f8f9fa", 
+            color: "#333", 
+            outline: "none", 
+            cursor: "pointer",
+            fontWeight: "500",
+            WebkitAppearance: "none", 
+            appearance: "none",
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="%23333" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>')`,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "right 8px center"
+          }}
+        >
+          <option value="">Selecione a data...</option>
+          {matches.map((m, index) => (
+            <option key={m.id} value={m.id}>
+              {m.date.split("-").reverse().join("/")} {getVotingStatusLabel(m, index)}
+            </option>
+          ))}
+        </select>
         <div style={{ marginTop: "10px", fontWeight: "bold", color: "#007bff" }}>{timeLeft}</div>
       </div>
 
       {selectedMatchId && votingPhase !== "WAITING" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
           
-          {/* Aparece APENAS quando toda a votação acaba (Máquina de Estado no CLOSED) */}
           {votingPhase === "CLOSED" && renderFinalWinnersCard()}
 
           <section>
