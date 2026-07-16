@@ -11,13 +11,14 @@ import VotingPage from "./pages/VotingPage.jsx";
 import CreateGroupPage from "./pages/CreateGroupPage.jsx";
 import GroupSelectionPage from "./pages/GroupSelectionPage.jsx";
 import FinancePage from "./pages/FinancePage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
 import { GroupProvider, useGroup } from "./contexts/GroupContext";
 
 import "./App.css";
 import { supabase } from "./supabaseClient";
 
 function AppContent() {
-  const [view, setView] = useState("matches");
+  const [view, setView] = useState("home");  // Aqui define qual a página inicial ao logar no app.
   const [user, setUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   
@@ -372,6 +373,7 @@ function AppContent() {
         {view === "voting" && <VotingPage user={user} />}
         {view === "ranking" && <RankingPage />}
         {view === "finance" && <FinancePage user={user} />}
+        {view === "home" && <DashboardPage user={user} onNavigate={handleChangeView} />}
       </main>
 
       <div
@@ -399,6 +401,11 @@ function AppContent() {
       >
         <div style={{ maxWidth: "600px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", height: "65px", padding: "0 6px", position: "relative" }}>
           
+          <button onClick={() => handleChangeView("home")} style={tabButtonStyle(view === "home")}>
+            <span style={{ fontSize: "20px" }}>🏠</span>
+            <span style={{ fontSize: "10px", marginTop: "3px" }}>Início</span>
+          </button>
+
           <button onClick={() => handleChangeView("matches")} style={tabButtonStyle(view === "matches")}>
             <span style={{ fontSize: "20px" }}>👍🏽</span>
             <span style={{ fontSize: "10px", marginTop: "3px" }}>Confirmação</span>
