@@ -8,7 +8,7 @@ export default function DashboardPage({ user, onNavigate }) {
   // Estado para armazenar as informações de "bate-pronto" do jogo de hoje
   const [hojeInfo, setHojeInfo] = useState(null);
 
-  // === MOTOR DE BUSCA DO JOGO DE HOJE ===
+  // === MOTOR DE BUSCA DO JOGO DE HOJE COM BLINDAGEM ===
   useEffect(() => {
     const buscarJogoDeHoje = async () => {
       if (!activeGroup || !user) return;
@@ -17,28 +17,33 @@ export default function DashboardPage({ user, onNavigate }) {
       const dataHoje = new Date().toISOString().split("T")[0];
 
       try {
-        // 1. Busca a partida de hoje na tabela 'matches'
+        // 1. Busca a partida de hoje na tabela 'matches' trazendo a coluna is_drawn
         const { data: partida, error: erroPartida } = await supabase
           .from("matches")
-          .select("id, team_a_name, team_b_name, team_c_name")
+          .select("id, is_drawn, team_a_name, team_b_name, team_c_name")
           .eq("id_grupo", activeGroup.id_grupo)
           .eq("date", dataHoje)
           .maybeSingle();
 
         if (erroPartida) throw erroPartida;
 
-        // Se houver partida hoje, vamos procurar o jogador na escalação
-        if (partida) {
+        // 👉 VALIDAÇÃO 1: Só prossegue se existir partida hoje E os times já tiverem sido sorteados
+        if (partida && partida.is_drawn === true) {
           
-          // 2. Busca do jogador na tabela 'match_player' de acordo com seu schema
+          // 2. Busca o jogador na tabela 'match_player'
           const { data: escalacao, error: erroEscalacao } = await supabase
             .from("match_player")
-            .select("team, shirt_number")
+            .select("team, shirt_number, status")
             .eq("match_id", partida.id)
             .eq("player_id", user.player_id)
             .maybeSingle();
 
-          if (escalacao) {
+          if (erroEscalacao) throw erroEscalacao;
+
+          // 👉 VALIDAÇÃO 2: Só exibe se o status for "confirmado" E houver time escalado
+          const isConfirmado = escalacao?.status?.toLowerCase() === "confirmado";
+
+          if (escalacao && isConfirmado && escalacao.team) {
             // Lógica inteligente para definir o nome real do time
             let nomeDoTime = "Time";
             const teamReferencia = escalacao.team ? escalacao.team.toLowerCase().trim() : "";
@@ -50,15 +55,20 @@ export default function DashboardPage({ user, onNavigate }) {
             } else if (teamReferencia === 'c' || teamReferencia === 'time c') {
               nomeDoTime = partida.team_c_name || "Time C";
             } else {
-              // Caso já venha o nome do time salvo direto na coluna
               nomeDoTime = escalacao.team || "Time"; 
             }
 
             setHojeInfo({
               time: nomeDoTime,
-              camisa: escalacao.shirt_number || "--" // Traz a camisa da coluna shirt_number
+              camisa: escalacao.shirt_number || "--"
             });
+          } else {
+            // Se o jogador não estiver confirmado ou não tiver time, limpa o card
+            setHojeInfo(null);
           }
+        } else {
+          // Se o jogo de hoje ainda não tiver sido sorteado (is_drawn = false/null), limpa o card
+          setHojeInfo(null);
         }
       } catch (error) {
         console.error("Erro ao buscar jogo de hoje:", error);
@@ -105,7 +115,7 @@ export default function DashboardPage({ user, onNavigate }) {
           </button>
         )}
 
-        {/* Card "Bate-Pronto" com Novo Layout */}
+        {/* Card "Bate-Pronto" com Layout Dividido e Validações de Sorteio/Presença */}
         {hojeInfo && (
           <div style={{ 
             marginTop: "10px", 
@@ -155,6 +165,32 @@ export default function DashboardPage({ user, onNavigate }) {
             </div>
           </div>
         )}
+
+        {/* BOTÃO PARA ACOMPANHAR/ABRIR SÚMULA AO VIVO (Aparece junto quando há jogo sorteado hoje) */}
+        {hojeInfo && (
+          <button
+            onClick={() => onNavigate("live_match")}
+            style={{
+              marginTop: "10px",
+              width: "100%",
+              padding: "16px",
+              background: "#dc2626",
+              color: "white",
+              border: "none",
+              borderRadius: "12px",
+              fontSize: "15px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px"
+            }}
+          >
+            <span>🔴</span> ACOMPANHAR JOGO AO VIVO
+          </button>
+        )}        
 
       </div>
     </div>
