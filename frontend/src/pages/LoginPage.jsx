@@ -90,7 +90,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
     const session = {
       user: userData,
-      expiresAt: Date.now() + (10 * 60 * 1000),
+      expiresAt: Date.now() + (100 * 60 * 1000),
       lastActivityAt: Date.now()
     };
 

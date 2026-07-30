@@ -3,15 +3,15 @@ import { useGroup } from "../contexts/GroupContext";
 import { supabase } from "../supabaseClient";
 
 export default function LiveMatchPage({ user, onNavigate }) {
-  const { activeGroup, isAdmin } = useGroup();
+  const { activeGroup } = useGroup();
 
-  // === ESTADOS DA PARTIDA ===
+  // === ESTADOS DA PARTIDA E JOGADORES ===
   const [partida, setPartida] = useState(null);
   const [jogadores, setJogadores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erroTela, setErroTela] = useState(null);
 
-  // === ESTADO DOS EVENTOS (GOLS) COM BACKUP NO LOCALSTORAGE ===
+  // === ESTADO DOS EVENTOS (GOLS) VINDO DO BANCO DE DADOS ===
   const [eventos, setEventos] = useState([]);
 
   // === ESTADOS DO MODAL DE REGISTRO DE GOL ===
@@ -21,7 +21,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
   const [golContra, setGolContra] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
-  // 1. BUSCA SEGURA COM TRAVA DE REABERTURA E BLINDAGEM DE JOIN
+  // 1. CARREGAR PARTIDA, JOGADORES E EVENTOS DO BANCO
   useEffect(() => {
     const carregarDadosPartida = async () => {
       if (!activeGroup) return;
@@ -31,7 +31,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
       const dataHoje = new Date().toISOString().split("T")[0];
 
       try {
-        // A) Busca partida de hoje
+        // A) Busca a partida sorteada de hoje
         const { data: matchData, error: matchError } = await supabase
           .from("matches")
           .select("*")
@@ -47,7 +47,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
           return;
         }
 
-        // 👉 TRAVA DE SEGURANÇA: Impede reabrir súmulas que já possuem gols oficiais gravados
+        // 👉 TRAVA DE SEGURANÇA: Impede reabrir se o placar oficial já tiver sido gravado
         const temGolsGravados =
           (matchData.score_a || 0) > 0 ||
           (matchData.score_b || 0) > 0 ||
@@ -63,19 +63,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
         setPartida(matchData);
 
-        // B) Carrega cache do localStorage com segurança contra JSON corrompido
-        const cacheKey = `sumula_eventos_match_${matchData.id}`;
-        const cacheSalvo = localStorage.getItem(cacheKey);
-        if (cacheSalvo) {
-          try {
-            const parsed = JSON.parse(cacheSalvo);
-            if (Array.isArray(parsed)) setEventos(parsed);
-          } catch (e) {
-            console.error("Erro ao ler cache:", e);
-          }
-        }
-
-        // C) Busca escalados na tabela match_player
+        // B) Busca jogadores escalados em match_player
         const { data: escData, error: escError } = await supabase
           .from("match_player")
           .select("player_id, team, shirt_number, status")
@@ -85,7 +73,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
         const listaEscalados = escData || [];
 
-        // D) Busca os nomes dos jogadores separadamente (Blinda contra erro de join)
+        // C) Mapeamento seguro de nomes dos jogadores na tabela players
         const ids = listaEscalados.map((j) => j.player_id).filter(Boolean);
         let mapaNomes = {};
 
@@ -100,7 +88,6 @@ export default function LiveMatchPage({ user, onNavigate }) {
           });
         }
 
-        // E) Filtra apenas confirmados e monta o array
         const confirmados = listaEscalados
           .filter((j) => j.status?.toLowerCase() === "confirmado" && j.team)
           .map((j) => ({
@@ -111,6 +98,44 @@ export default function LiveMatchPage({ user, onNavigate }) {
           }));
 
         setJogadores(confirmados);
+
+        // D) Busca a timeline de gols em match_events (Compartilhado entre todos os celulares)
+        const { data: evData, error: evError } = await supabase
+          .from("match_events")
+          .select("*")
+          .eq("match_id", matchData.id)
+          .order("created_at", { ascending: false });
+
+        if (evError) throw evError;
+
+        // Monta os eventos relacionando com os dados dos jogadores confirmados
+        const eventosFormatados = (evData || []).map((ev) => {
+          const art = confirmados.find((j) => j.player_id === ev.scorer_id) || {
+            player_id: ev.scorer_id,
+            nome: `Jogador #${ev.scorer_id}`,
+            camisa: "--",
+          };
+          const ass = ev.assist_id
+            ? confirmados.find((j) => j.player_id === ev.assist_id) || {
+                player_id: ev.assist_id,
+                nome: `Jogador #${ev.assist_id}`,
+              }
+            : null;
+
+          return {
+            id: ev.id,
+            hora: new Date(ev.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            artilheiro: art,
+            assistente: ass,
+            golContra: ev.is_own_goal,
+            teamLetter: ev.team_letter,
+          };
+        });
+
+        setEventos(eventosFormatados);
       } catch (error) {
         console.error("Erro ao carregar partida ao vivo:", error);
         setErroTela("❌ Ocorreu um erro ao buscar os dados da partida.");
@@ -122,15 +147,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
     carregarDadosPartida();
   }, [activeGroup, onNavigate]);
 
-  // 2. ATUALIZAR LOCALSTORAGE SEMPRE QUE OS EVENTOS MUDAM
-  useEffect(() => {
-    if (partida?.id) {
-      const cacheKey = `sumula_eventos_match_${partida.id}`;
-      localStorage.setItem(cacheKey, JSON.stringify(eventos));
-    }
-  }, [eventos, partida]);
-
-  // === CÁLCULO DINÂMICO DO PLACAR ===
+  // === CÁLCULO DINÂMICO DO PLACAR (BASEADO NOS EVENTOS DO BANCO) ===
   const calcularPlacar = () => {
     const placar = { a: 0, b: 0, c: 0 };
     eventos.forEach((ev) => {
@@ -161,45 +178,87 @@ export default function LiveMatchPage({ user, onNavigate }) {
     return "Time";
   };
 
-  const handleSalvarGol = () => {
-    if (!artilheiro) return;
-
-    const horaAtual = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  // === INSERIR NOVO GOL NA TABELA match_events (COM BLINDAGEM DE TIPOS) ===
+  const handleSalvarGol = async () => {
+    if (!artilheiro || !partida) return;
 
     let teamLetter = getTeamLetter(artilheiro.team);
     if (golContra) {
       teamLetter = teamLetter === "a" ? "b" : "a";
     }
 
-    const novoEvento = {
-      id: Date.now(),
-      hora: horaAtual,
-      artilheiro: artilheiro,
-      assistente: assistente === "solo" ? null : assistente,
-      golContra: golContra,
-      teamLetter: teamLetter,
-    };
+    try {
+      // 👉 Garantimos que IDs sejam números (Number) e a letra tenha 1 caractere
+      const novoRegistro = {
+        match_id: Number(partida.id),
+        scorer_id: Number(artilheiro.player_id),
+        assist_id: (assistente === "solo" || !assistente) ? null : Number(assistente.player_id),
+        is_own_goal: Boolean(golContra),
+        team_letter: String(teamLetter).charAt(0).toLowerCase(),
+        created_by: user?.player_id ? Number(user.player_id) : null,
+      };
 
-    setEventos([novoEvento, ...eventos]);
-    setModalOpen(false);
-    setArtilheiro(null);
-    setAssistente("solo");
-    setGolContra(false);
-  };
+      const { data: evInserido, error } = await supabase
+        .from("match_events")
+        .insert([novoRegistro])
+        .select()
+        .single();
 
-  const handleRemoverEvento = (idEvento) => {
-    if (window.confirm("🗑️ Deseja remover este gol da súmula?")) {
-      setEventos(eventos.filter((ev) => ev.id !== idEvento));
+      if (error) {
+        console.error("Detalhes do erro Supabase:", error);
+        throw error;
+      }
+
+      // Adiciona na hora ao topo da tela sem precisar recarregar a página
+      const eventoVisual = {
+        id: evInserido.id,
+        hora: new Date(evInserido.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        artilheiro: artilheiro,
+        assistente: assistente === "solo" ? null : assistente,
+        golContra: golContra,
+        teamLetter: teamLetter,
+      };
+
+      setEventos([eventoVisual, ...eventos]);
+      setModalOpen(false);
+      setArtilheiro(null);
+      setAssistente("solo");
+      setGolContra(false);
+    } catch (error) {
+      console.error("Erro ao gravar evento de gol:", error);
+      // 👉 Alerta explicativo mostrando a mensagem exata do Postgres em caso de falha
+      const msgErro = error?.message || error?.details || JSON.stringify(error);
+      alert(`❌ Erro ao salvar gol: ${msgErro}`);
     }
   };
 
+  // === REMOVER GOL DA TABELA match_events (DESFAZER ERRO) ===
+  const handleRemoverEvento = async (idEvento) => {
+    if (!window.confirm("🗑️ Deseja remover este gol da súmula oficial?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("match_events")
+        .delete()
+        .eq("id", idEvento);
+
+      if (error) throw error;
+
+      setEventos(eventos.filter((ev) => ev.id !== idEvento));
+    } catch (error) {
+      console.error("Erro ao remover evento:", error);
+      alert("❌ Erro ao excluir gol do banco de dados.");
+    }
+  };
+
+  // === FINALIZAR PARTIDA E GRAVAR PLACAR OFICIAL ===
   const handleFinalizarPartida = async () => {
     if (!partida) return;
     const confirmou = window.confirm(
-      "🏁 Encerrar partida e gravar placar oficial na súmula? Esta ação atualizará os gols e assistências dos jogadores."
+      "🏁 Encerrar partida e gravar placar oficial na súmula? Esta ação atualizará os gols e assistências definitivas dos jogadores no ranking."
     );
     if (!confirmou) return;
 
@@ -211,6 +270,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
         stats[j.player_id] = { goals: 0, assists: 0, own_goals: 0 };
       });
 
+      // Consolida todos os gols registrados em match_events
       eventos.forEach((ev) => {
         const idArt = ev.artilheiro?.player_id;
         if (idArt && stats[idArt]) {
@@ -226,6 +286,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
         }
       });
 
+      // 1. Atualiza as estatísticas individuais em match_player
       const promises = Object.entries(stats).map(
         async ([playerId, contadores]) => {
           if (
@@ -248,6 +309,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
       await Promise.all(promises);
 
+      // 2. Grava o placar final em matches (Isso trava a reabertura automática da súmula!)
       const { error: matchUpdateError } = await supabase
         .from("matches")
         .update({
@@ -259,9 +321,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
       if (matchUpdateError) throw matchUpdateError;
 
-      localStorage.removeItem(`sumula_eventos_match_${partida.id}`);
-
-      alert("✅ GOLAÇO! Súmula finalizada e estatísticas gravadas com sucesso.");
+      alert("✅ GOLAÇO! Súmula finalizada e estatísticas oficiais gravadas com sucesso.");
       onNavigate("home");
     } catch (error) {
       console.error("Erro ao gravar súmula:", error);
