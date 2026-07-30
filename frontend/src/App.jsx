@@ -12,6 +12,7 @@ import CreateGroupPage from "./pages/CreateGroupPage.jsx";
 import GroupSelectionPage from "./pages/GroupSelectionPage.jsx";
 import FinancePage from "./pages/FinancePage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
+import LiveMatchPage from "./pages/LiveMatchPage.jsx";
 import { GroupProvider, useGroup } from "./contexts/GroupContext";
 
 import "./App.css";
@@ -373,6 +374,7 @@ function AppContent() {
         {view === "voting" && <VotingPage user={user} />}
         {view === "ranking" && <RankingPage />}
         {view === "finance" && <FinancePage user={user} />}
+        {view === "live_match" && <LiveMatchPage user={user} onNavigate={handleChangeView} />}
         {view === "home" && <DashboardPage user={user} onNavigate={handleChangeView} />}
       </main>
 
