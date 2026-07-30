@@ -37,7 +37,7 @@ function AppContent() {
 
   const { activeGroup, changeGroup, clearGroup, isAdmin } = useGroup();
 
-  const SESSION_DURATION = 10 * 60 * 1000; 
+  const SESSION_DURATION = 100 * 60 * 1000; 
 
   const renovarSessao = () => {
     const session = localStorage.getItem("session");
