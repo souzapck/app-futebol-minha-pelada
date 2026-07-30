@@ -119,7 +119,7 @@ export default function DashboardPage({ user, onNavigate }) {
         {/* Card da Tesouraria com blindagem de configuração */}
         {mostrarBotaoTesouraria && (
           <button onClick={() => onNavigate("finance")} style={{ padding: "15px", background: "#f8f9fa", border: "1px solid #eee", borderRadius: "12px", fontWeight: "bold", cursor: "pointer", color: "#555" }}>
-            🏦 Banco
+            🏦 Tesouraria
           </button>
         )}
 
