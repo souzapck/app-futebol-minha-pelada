@@ -8,7 +8,7 @@ export default function DashboardPage({ user, onNavigate }) {
   // Estado para armazenar as informações de "bate-pronto" do jogo de hoje
   const [hojeInfo, setHojeInfo] = useState(null);
 
-  // === MOTOR DE BUSCA DO JOGO DE HOJE COM BLINDAGEM ===
+  // === MOTOR DE BUSCA DO JOGO DE HOJE COM TRAVAS DE SEGURANÇA ===
   useEffect(() => {
     const buscarJogoDeHoje = async () => {
       if (!activeGroup || !user) return;
@@ -17,19 +17,26 @@ export default function DashboardPage({ user, onNavigate }) {
       const dataHoje = new Date().toISOString().split("T")[0];
 
       try {
-        // 1. Busca a partida de hoje na tabela 'matches' trazendo a coluna is_drawn
+        // 1. Busca a partida de hoje trazendo também os placares para validação de trava
         const { data: partida, error: erroPartida } = await supabase
           .from("matches")
-          .select("id, is_drawn, team_a_name, team_b_name, team_c_name")
+          .select("id, is_drawn, team_a_name, team_b_name, team_c_name, score_a, score_b, score_c")
           .eq("id_grupo", activeGroup.id_grupo)
           .eq("date", dataHoje)
           .maybeSingle();
 
         if (erroPartida) throw erroPartida;
 
-        // 👉 VALIDAÇÃO 1: Só prossegue se existir partida hoje E os times já tiverem sido sorteados
+        // 👉 TRAVA 1: Só prossegue se existir partida hoje E os times já tiverem sido sorteados
         if (partida && partida.is_drawn === true) {
           
+          // 👉 TRAVA 2: Verifica se já existem gols registrados no placar oficial da partida
+          const sumulaEncerrada = (
+            (partida.score_a || 0) > 0 ||
+            (partida.score_b || 0) > 0 ||
+            (partida.score_c || 0) > 0
+          );
+
           // 2. Busca o jogador na tabela 'match_player'
           const { data: escalacao, error: erroEscalacao } = await supabase
             .from("match_player")
@@ -40,7 +47,7 @@ export default function DashboardPage({ user, onNavigate }) {
 
           if (erroEscalacao) throw erroEscalacao;
 
-          // 👉 VALIDAÇÃO 2: Só exibe se o status for "confirmado" E houver time escalado
+          // 👉 TRAVA 3: Só exibe se o status for "confirmado" E houver time escalado
           const isConfirmado = escalacao?.status?.toLowerCase() === "confirmado";
 
           if (escalacao && isConfirmado && escalacao.team) {
@@ -60,14 +67,15 @@ export default function DashboardPage({ user, onNavigate }) {
 
             setHojeInfo({
               time: nomeDoTime,
-              camisa: escalacao.shirt_number || "--"
+              camisa: escalacao.shirt_number || "--",
+              encerrada: sumulaEncerrada // Passa o status de trava da súmula
             });
           } else {
-            // Se o jogador não estiver confirmado ou não tiver time, limpa o card
+            // Se não estiver confirmado ou não tiver time, não mostra o card
             setHojeInfo(null);
           }
         } else {
-          // Se o jogo de hoje ainda não tiver sido sorteado (is_drawn = false/null), limpa o card
+          // Se o jogo não foi sorteado ainda, não mostra o card
           setHojeInfo(null);
         }
       } catch (error) {
@@ -84,7 +92,7 @@ export default function DashboardPage({ user, onNavigate }) {
   const mostrarBotaoTesouraria = moduloTesourariaAtivo && (isAdmin || jogadorPedeVerTesouraria);
 
   return (
-    <div style={{ padding: "20px", maxWidth: "400px", margin: "0 auto", textAlign: "center" }}>
+    <div style={{ padding: "20px", maxWidth: "400px", margin: "0 auto", textAlign: "center", fontFamily: "Arial, sans-serif" }}>
       <h1 style={{ fontSize: "22px", color: "#333", marginBottom: "30px" }}>
         Olá, {user?.players?.name?.split(" ")[0]}! 👋
       </h1>
@@ -108,14 +116,14 @@ export default function DashboardPage({ user, onNavigate }) {
           </button>
         </div>
         
-        {/* Card da Tesouraria */}
+        {/* Card da Tesouraria com blindagem de configuração */}
         {mostrarBotaoTesouraria && (
           <button onClick={() => onNavigate("finance")} style={{ padding: "15px", background: "#f8f9fa", border: "1px solid #eee", borderRadius: "12px", fontWeight: "bold", cursor: "pointer", color: "#555" }}>
-            🏦 Tesouraria
+            🏦 Banco
           </button>
         )}
 
-        {/* Card "Bate-Pronto" com Layout Dividido e Validações de Sorteio/Presença */}
+        {/* Card "Bate-Pronto" com Layout Dividido (50/50) e Título Centralizado */}
         {hojeInfo && (
           <div style={{ 
             marginTop: "10px", 
@@ -166,8 +174,8 @@ export default function DashboardPage({ user, onNavigate }) {
           </div>
         )}
 
-        {/* BOTÃO PARA ACOMPANHAR/ABRIR SÚMULA AO VIVO (Aparece junto quando há jogo sorteado hoje) */}
-        {hojeInfo && (
+        {/* BOTÃO INTELIGENTE: Súmula ao Vivo OU Aviso de Súmula Encerrada */}
+        {hojeInfo && !hojeInfo.encerrada && (
           <button
             onClick={() => onNavigate("live_match")}
             style={{
@@ -190,7 +198,32 @@ export default function DashboardPage({ user, onNavigate }) {
           >
             <span>🔴</span> ACOMPANHAR JOGO AO VIVO
           </button>
-        )}        
+        )}
+
+        {/* CARD DE BLOQUEIO: Exibe quando o jogo já foi gravado no banco */}
+        {hojeInfo && hojeInfo.encerrada && (
+          <div
+            style={{
+              marginTop: "10px",
+              width: "100%",
+              padding: "14px",
+              background: "#e2e8f0",
+              color: "#475569",
+              borderRadius: "12px",
+              fontSize: "13px",
+              fontWeight: "bold",
+              textAlign: "center",
+              border: "1px solid #cbd5e1",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxSizing: "border-box"
+            }}
+          >
+            <span>🔒</span> SÚMULA ENCERRADA E PLACAR GRAVADO
+          </div>
+        )}
 
       </div>
     </div>

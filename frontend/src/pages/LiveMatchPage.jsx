@@ -21,7 +21,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
   const [golContra, setGolContra] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
-  // 1. BUSCA SEGURA SEM ERROS DE JOIN DO SUPABASE
+  // 1. BUSCA SEGURA COM TRAVA DE REABERTURA E BLINDAGEM DE JOIN
   useEffect(() => {
     const carregarDadosPartida = async () => {
       if (!activeGroup) return;
@@ -44,6 +44,20 @@ export default function LiveMatchPage({ user, onNavigate }) {
         if (!matchData) {
           setErroTela("⚠️ Nenhuma partida sorteada foi encontrada para hoje.");
           setLoading(false);
+          return;
+        }
+
+        // 👉 TRAVA DE SEGURANÇA: Impede reabrir súmulas que já possuem gols oficiais gravados
+        const temGolsGravados =
+          (matchData.score_a || 0) > 0 ||
+          (matchData.score_b || 0) > 0 ||
+          (matchData.score_c || 0) > 0;
+
+        if (temGolsGravados) {
+          alert(
+            "🔒 Esta súmula já foi finalizada e o placar oficial foi gravado! Não é possível reabrir para evitar sobrescrever estatísticas."
+          );
+          onNavigate("home");
           return;
         }
 
@@ -93,7 +107,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
             player_id: j.player_id,
             nome: mapaNomes[j.player_id] || `Jogador #${j.player_id}`,
             camisa: j.shirt_number || "--",
-            team: String(j.team || "").toLowerCase().trim()
+            team: String(j.team || "").toLowerCase().trim(),
           }));
 
         setJogadores(confirmados);
@@ -106,7 +120,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
     };
 
     carregarDadosPartida();
-  }, [activeGroup]);
+  }, [activeGroup, onNavigate]);
 
   // 2. ATUALIZAR LOCALSTORAGE SEMPRE QUE OS EVENTOS MUDAM
   useEffect(() => {
@@ -152,7 +166,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
     const horaAtual = new Date().toLocaleTimeString([], {
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
     });
 
     let teamLetter = getTeamLetter(artilheiro.team);
@@ -166,7 +180,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
       artilheiro: artilheiro,
       assistente: assistente === "solo" ? null : assistente,
       golContra: golContra,
-      teamLetter: teamLetter
+      teamLetter: teamLetter,
     };
 
     setEventos([novoEvento, ...eventos]);
@@ -224,7 +238,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
               .update({
                 goals: contadores.goals,
                 assists: contadores.assists,
-                own_goals: contadores.own_goals
+                own_goals: contadores.own_goals,
               })
               .eq("match_id", partida.id)
               .eq("player_id", Number(playerId));
@@ -239,7 +253,7 @@ export default function LiveMatchPage({ user, onNavigate }) {
         .update({
           score_a: placarAtual.a,
           score_b: placarAtual.b,
-          score_c: placarAtual.c
+          score_c: placarAtual.c,
         })
         .eq("id", partida.id);
 
@@ -263,7 +277,14 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: "50px", color: "#666", fontFamily: "Arial, sans-serif" }}>
+      <div
+        style={{
+          textAlign: "center",
+          padding: "50px",
+          color: "#666",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
         ⚽ Abrindo Súmula de Jogo...
       </div>
     );
@@ -271,11 +292,29 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
   if (erroTela) {
     return (
-      <div style={{ textAlign: "center", padding: "40px 20px", fontFamily: "Arial, sans-serif" }}>
-        <div style={{ color: "#dc3545", fontWeight: "bold", marginBottom: "15px" }}>{erroTela}</div>
+      <div
+        style={{
+          textAlign: "center",
+          padding: "40px 20px",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        <div
+          style={{ color: "#dc3545", fontWeight: "bold", marginBottom: "15px" }}
+        >
+          {erroTela}
+        </div>
         <button
           onClick={() => onNavigate("home")}
-          style={{ background: "#007bff", color: "#fff", border: "none", padding: "10px 18px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}
+          style={{
+            background: "#007bff",
+            color: "#fff",
+            border: "none",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            fontWeight: "bold",
+            cursor: "pointer",
+          }}
         >
           ⬅ Voltar ao Início
         </button>
@@ -284,45 +323,143 @@ export default function LiveMatchPage({ user, onNavigate }) {
   }
 
   return (
-    <div style={{ padding: "15px", maxWidth: "500px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
+    <div
+      style={{
+        padding: "15px",
+        maxWidth: "500px",
+        margin: "0 auto",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       {/* Botão de Voltar */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: "15px",
+        }}
+      >
         <button
           onClick={() => onNavigate("home")}
-          style={{ background: "#f1f3f5", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", color: "#495057" }}
+          style={{
+            background: "#f1f3f5",
+            border: "none",
+            padding: "8px 14px",
+            borderRadius: "8px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            color: "#495057",
+          }}
         >
           ⬅ Voltar ao Início
         </button>
-        <span style={{ fontSize: "12px", fontWeight: "bold", color: "#dc3545", alignSelf: "center" }}>
+        <span
+          style={{
+            fontSize: "12px",
+            fontWeight: "bold",
+            color: "#dc3545",
+            alignSelf: "center",
+          }}
+        >
           🔴 AO VIVO
         </span>
       </div>
 
       {/* BLOCO 1: PLACAR GERAL EM TEMPO REAL */}
-      <div style={{ background: "#1e293b", color: "#fff", padding: "20px 10px", borderRadius: "16px", textAlign: "center", boxShadow: "0 6px 16px rgba(0,0,0,0.2)", marginBottom: "20px" }}>
-        <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", color: "#94a3b8", marginBottom: "12px", fontWeight: "bold" }}>
+      <div
+        style={{
+          background: "#1e293b",
+          color: "#fff",
+          padding: "20px 10px",
+          borderRadius: "16px",
+          textAlign: "center",
+          boxShadow: "0 6px 16px rgba(0,0,0,0.2)",
+          marginBottom: "20px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "11px",
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+            color: "#94a3b8",
+            marginBottom: "12px",
+            fontWeight: "bold",
+          }}
+        >
           Placar em Tempo Real
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", gap: "8px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-around",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "12px", fontWeight: "bold", color: "#cbd5e1" }}>{getNomeTime("a")}</div>
-            <div style={{ fontSize: "36px", fontWeight: "900", color: "#38bdf8" }}>{placarAtual.a}</div>
+            <div
+              style={{ fontSize: "12px", fontWeight: "bold", color: "#cbd5e1" }}
+            >
+              {getNomeTime("a")}
+            </div>
+            <div
+              style={{ fontSize: "36px", fontWeight: "900", color: "#38bdf8" }}
+            >
+              {placarAtual.a}
+            </div>
           </div>
 
-          <div style={{ fontSize: "20px", fontWeight: "bold", color: "#64748b" }}>X</div>
+          <div
+            style={{ fontSize: "20px", fontWeight: "bold", color: "#64748b" }}
+          >
+            X
+          </div>
 
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "12px", fontWeight: "bold", color: "#cbd5e1" }}>{getNomeTime("b")}</div>
-            <div style={{ fontSize: "36px", fontWeight: "900", color: "#f87171" }}>{placarAtual.b}</div>
+            <div
+              style={{ fontSize: "12px", fontWeight: "bold", color: "#cbd5e1" }}
+            >
+              {getNomeTime("b")}
+            </div>
+            <div
+              style={{ fontSize: "36px", fontWeight: "900", color: "#f87171" }}
+            >
+              {placarAtual.b}
+            </div>
           </div>
 
           {partida?.team_c_name && (
             <>
-              <div style={{ fontSize: "20px", fontWeight: "bold", color: "#64748b" }}>X</div>
+              <div
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "bold",
+                  color: "#64748b",
+                }}
+              >
+                X
+              </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "12px", fontWeight: "bold", color: "#cbd5e1" }}>{getNomeTime("c")}</div>
-                <div style={{ fontSize: "36px", fontWeight: "900", color: "#4ade80" }}>{placarAtual.c}</div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    color: "#cbd5e1",
+                  }}
+                >
+                  {getNomeTime("c")}
+                </div>
+                <div
+                  style={{
+                    fontSize: "36px",
+                    fontWeight: "900",
+                    color: "#4ade80",
+                  }}
+                >
+                  {placarAtual.c}
+                </div>
               </div>
             </>
           )}
@@ -332,45 +469,159 @@ export default function LiveMatchPage({ user, onNavigate }) {
       {/* BLOCO 2: BOTÃO GIGANTE DE REGISTRO DE GOL */}
       <button
         onClick={() => setModalOpen(true)}
-        style={{ width: "100%", padding: "18px", background: "#16a34a", color: "white", border: "none", borderRadius: "14px", fontSize: "18px", fontWeight: "bold", cursor: "pointer", boxShadow: "0 4px 12px rgba(22, 163, 74, 0.3)", marginBottom: "25px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
+        style={{
+          width: "100%",
+          padding: "18px",
+          background: "#16a34a",
+          color: "white",
+          border: "none",
+          borderRadius: "14px",
+          fontSize: "18px",
+          fontWeight: "bold",
+          cursor: "pointer",
+          boxShadow: "0 4px 12px rgba(22, 163, 74, 0.3)",
+          marginBottom: "25px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "10px",
+        }}
       >
         <span>⚽</span> + REGISTRAR NOVO GOL
       </button>
 
       {/* BLOCO 3: TIMELINE / HISTÓRICO DA PARTIDA */}
       <div style={{ marginBottom: "30px", textAlign: "left" }}>
-        <h3 style={{ fontSize: "14px", color: "#475569", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        <h3
+          style={{
+            fontSize: "14px",
+            color: "#475569",
+            marginBottom: "12px",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+          }}
+        >
           📋 Histórico da Partida
         </h3>
 
         {eventos.length === 0 ? (
-          <div style={{ background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "10px", padding: "25px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px dashed #cbd5e1",
+              borderRadius: "10px",
+              padding: "25px",
+              textAlign: "center",
+              color: "#94a3b8",
+              fontSize: "13px",
+            }}
+          >
             Nenhum gol registrado na partida ainda.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {eventos.map((ev) => (
-              <div key={ev.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "12px 14px", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: "bold", color: "#64748b", background: "#f1f5f9", padding: "4px 8px", borderRadius: "6px" }}>{ev.hora}</span>
+              <div
+                key={ev.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "10px",
+                  padding: "12px 14px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      color: "#64748b",
+                      background: "#f1f5f9",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    {ev.hora}
+                  </span>
 
                   <div>
-                    <div style={{ fontSize: "14px", fontWeight: "bold", color: "#1e293b" }}>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        color: "#1e293b",
+                      }}
+                    >
                       ⚽ {ev.artilheiro?.nome}{" "}
-                      <span style={{ fontSize: "11px", fontWeight: "normal", color: "#64748b" }}>(Camisa {ev.artilheiro?.camisa})</span>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "normal",
+                          color: "#64748b",
+                        }}
+                      >
+                        (Camisa {ev.artilheiro?.camisa})
+                      </span>
                     </div>
 
-                    <div style={{ fontSize: "11px", color: ev.golContra ? "#dc3545" : "#64748b", marginTop: "2px" }}>
-                      {ev.golContra ? "⚠️ Gol Contra" : ev.assistente ? `👟 Assistência: ${ev.assistente.nome}` : "⚡ Gol Solo"}
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: ev.golContra ? "#dc3545" : "#64748b",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {ev.golContra
+                        ? "⚠️ Gol Contra"
+                        : ev.assistente
+                        ? `👟 Assistência: ${ev.assistente.nome}`
+                        : "⚡ Gol Solo"}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: "bold", padding: "4px 8px", borderRadius: "6px", background: ev.teamLetter === "a" ? "#e0f2fe" : ev.teamLetter === "b" ? "#fee2e2" : "#dcfce7", color: ev.teamLetter === "a" ? "#0369a1" : ev.teamLetter === "b" ? "#b91c1c" : "#15803d" }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      background:
+                        ev.teamLetter === "a"
+                          ? "#e0f2fe"
+                          : ev.teamLetter === "b"
+                          ? "#fee2e2"
+                          : "#dcfce7",
+                      color:
+                        ev.teamLetter === "a"
+                          ? "#0369a1"
+                          : ev.teamLetter === "b"
+                          ? "#b91c1c"
+                          : "#15803d",
+                    }}
+                  >
                     {getNomeTime(ev.teamLetter)}
                   </span>
-                  <button onClick={() => handleRemoverEvento(ev.id)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "14px", opacity: 0.6 }} title="Remover este gol">
+                  <button
+                    onClick={() => handleRemoverEvento(ev.id)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      opacity: 0.6,
+                    }}
+                    title="Remover este gol"
+                  >
                     🗑️
                   </button>
                 </div>
@@ -384,32 +635,134 @@ export default function LiveMatchPage({ user, onNavigate }) {
       <button
         onClick={handleFinalizarPartida}
         disabled={salvando}
-        style={{ width: "100%", padding: "16px", background: salvando ? "#cbd5e1" : "#ea580c", color: "white", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: "bold", cursor: salvando ? "not-allowed" : "pointer", boxShadow: "0 4px 10px rgba(234, 88, 12, 0.2)" }}
+        style={{
+          width: "100%",
+          padding: "16px",
+          background: salvando ? "#cbd5e1" : "#ea580c",
+          color: "white",
+          border: "none",
+          borderRadius: "12px",
+          fontSize: "15px",
+          fontWeight: "bold",
+          cursor: salvando ? "not-allowed" : "pointer",
+          boxShadow: "0 4px 10px rgba(234, 88, 12, 0.2)",
+        }}
       >
-        {salvando ? "Gravando Súmula..." : "🏁 FINALIZAR PARTIDA E GRAVAR SÚMULA"}
+        {salvando
+          ? "Gravando Súmula..."
+          : "🏁 FINALIZAR PARTIDA E GRAVAR SÚMULA"}
       </button>
 
       {/* MODAL / POPUP DE REGISTRO DE GOL */}
       {modalOpen && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3000, padding: "15px" }}>
-          <div style={{ background: "#fff", width: "100%", maxWidth: "450px", borderRadius: "16px", padding: "20px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.3)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-              <h3 style={{ margin: 0, fontSize: "18px", color: "#1e293b" }}>⚽ Quem fez o gol?</h3>
-              <button onClick={() => { setModalOpen(false); setArtilheiro(null); setAssistente("solo"); setGolContra(false); }} style={{ background: "#f1f5f9", border: "none", borderRadius: "50%", width: "30px", height: "30px", fontWeight: "bold", cursor: "pointer" }}>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 3000,
+            padding: "15px",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              width: "100%",
+              maxWidth: "450px",
+              borderRadius: "16px",
+              padding: "20px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "15px",
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: "18px", color: "#1e293b" }}>
+                ⚽ Quem fez o gol?
+              </h3>
+              <button
+                onClick={() => {
+                  setModalOpen(false);
+                  setArtilheiro(null);
+                  setAssistente("solo");
+                  setGolContra(false);
+                }}
+                style={{
+                  background: "#f1f5f9",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "30px",
+                  height: "30px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
                 ✕
               </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "15px", marginBottom: "20px" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "15px",
+                marginBottom: "20px",
+              }}
+            >
               {timeA.length > 0 && (
                 <div>
-                  <div style={{ fontSize: "11px", fontWeight: "bold", color: "#0369a1", textTransform: "uppercase", marginBottom: "6px" }}>{getNomeTime("a")}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      color: "#0369a1",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    {getNomeTime("a")}
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "6px",
+                    }}
+                  >
                     {timeA.map((jog) => (
                       <button
                         key={jog.player_id}
-                        onClick={() => { setArtilheiro(jog); setAssistente("solo"); setGolContra(false); }}
-                        style={{ padding: "10px", borderRadius: "8px", border: artilheiro?.player_id === jog.player_id ? "2px solid #0284c7" : "1px solid #e2e8f0", background: artilheiro?.player_id === jog.player_id ? "#e0f2fe" : "#fff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", textAlign: "left" }}
+                        onClick={() => {
+                          setArtilheiro(jog);
+                          setAssistente("solo");
+                          setGolContra(false);
+                        }}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border:
+                            artilheiro?.player_id === jog.player_id
+                              ? "2px solid #0284c7"
+                              : "1px solid #e2e8f0",
+                          background:
+                            artilheiro?.player_id === jog.player_id
+                              ? "#e0f2fe"
+                              : "#fff",
+                          fontWeight: "bold",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
                       >
                         #{jog.camisa} {jog.nome}
                       </button>
@@ -420,13 +773,48 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
               {timeB.length > 0 && (
                 <div>
-                  <div style={{ fontSize: "11px", fontWeight: "bold", color: "#b91c1c", textTransform: "uppercase", marginBottom: "6px" }}>{getNomeTime("b")}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      color: "#b91c1c",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    {getNomeTime("b")}
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "6px",
+                    }}
+                  >
                     {timeB.map((jog) => (
                       <button
                         key={jog.player_id}
-                        onClick={() => { setArtilheiro(jog); setAssistente("solo"); setGolContra(false); }}
-                        style={{ padding: "10px", borderRadius: "8px", border: artilheiro?.player_id === jog.player_id ? "2px solid #dc2626" : "1px solid #e2e8f0", background: artilheiro?.player_id === jog.player_id ? "#fee2e2" : "#fff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", textAlign: "left" }}
+                        onClick={() => {
+                          setArtilheiro(jog);
+                          setAssistente("solo");
+                          setGolContra(false);
+                        }}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border:
+                            artilheiro?.player_id === jog.player_id
+                              ? "2px solid #dc2626"
+                              : "1px solid #e2e8f0",
+                          background:
+                            artilheiro?.player_id === jog.player_id
+                              ? "#fee2e2"
+                              : "#fff",
+                          fontWeight: "bold",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
                       >
                         #{jog.camisa} {jog.nome}
                       </button>
@@ -437,13 +825,48 @@ export default function LiveMatchPage({ user, onNavigate }) {
 
               {timeC.length > 0 && (
                 <div>
-                  <div style={{ fontSize: "11px", fontWeight: "bold", color: "#15803d", textTransform: "uppercase", marginBottom: "6px" }}>{getNomeTime("c")}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      color: "#15803d",
+                      textTransform: "uppercase",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    {getNomeTime("c")}
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "6px",
+                    }}
+                  >
                     {timeC.map((jog) => (
                       <button
                         key={jog.player_id}
-                        onClick={() => { setArtilheiro(jog); setAssistente("solo"); setGolContra(false); }}
-                        style={{ padding: "10px", borderRadius: "8px", border: artilheiro?.player_id === jog.player_id ? "2px solid #16a34a" : "1px solid #e2e8f0", background: artilheiro?.player_id === jog.player_id ? "#dcfce7" : "#fff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", textAlign: "left" }}
+                        onClick={() => {
+                          setArtilheiro(jog);
+                          setAssistente("solo");
+                          setGolContra(false);
+                        }}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border:
+                            artilheiro?.player_id === jog.player_id
+                              ? "2px solid #16a34a"
+                              : "1px solid #e2e8f0",
+                          background:
+                            artilheiro?.player_id === jog.player_id
+                              ? "#dcfce7"
+                              : "#fff",
+                          fontWeight: "bold",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
                       >
                         #{jog.camisa} {jog.nome}
                       </button>
@@ -454,12 +877,45 @@ export default function LiveMatchPage({ user, onNavigate }) {
             </div>
 
             {artilheiro && (
-              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "15px", marginBottom: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <label style={{ fontSize: "13px", fontWeight: "bold", color: "#334155" }}>👟 Quem deu a assistência?</label>
+              <div
+                style={{
+                  borderTop: "1px solid #e2e8f0",
+                  paddingTop: "15px",
+                  marginBottom: "20px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      color: "#334155",
+                    }}
+                  >
+                    👟 Quem deu a assistência?
+                  </label>
                   <button
-                    onClick={() => { setGolContra(!golContra); setAssistente("solo"); }}
-                    style={{ background: golContra ? "#dc3545" : "#f1f5f9", color: golContra ? "#fff" : "#64748b", border: "none", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
+                    onClick={() => {
+                      setGolContra(!golContra);
+                      setAssistente("solo");
+                    }}
+                    style={{
+                      background: golContra ? "#dc3545" : "#f1f5f9",
+                      color: golContra ? "#fff" : "#64748b",
+                      border: "none",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
                   >
                     ⚠️ Gol Contra
                   </button>
@@ -469,25 +925,64 @@ export default function LiveMatchPage({ user, onNavigate }) {
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                     <button
                       onClick={() => setAssistente("solo")}
-                      style={{ padding: "8px 12px", borderRadius: "20px", border: assistente === "solo" ? "2px solid #007bff" : "1px solid #cbd5e1", background: assistente === "solo" ? "#eef2ff" : "#fff", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "20px",
+                        border:
+                          assistente === "solo"
+                            ? "2px solid #007bff"
+                            : "1px solid #cbd5e1",
+                        background:
+                          assistente === "solo" ? "#eef2ff" : "#fff",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                      }}
                     >
                       ⚡ Gol Solo / Sem Assist.
                     </button>
 
                     {jogadores
-                      .filter((j) => getTeamLetter(j.team) === getTeamLetter(artilheiro.team) && j.player_id !== artilheiro.player_id)
+                      .filter(
+                        (j) =>
+                          getTeamLetter(j.team) ===
+                            getTeamLetter(artilheiro.team) &&
+                          j.player_id !== artilheiro.player_id
+                      )
                       .map((parceiro) => (
                         <button
                           key={parceiro.player_id}
                           onClick={() => setAssistente(parceiro)}
-                          style={{ padding: "8px 12px", borderRadius: "20px", border: assistente?.player_id === parceiro.player_id ? "2px solid #007bff" : "1px solid #cbd5e1", background: assistente?.player_id === parceiro.player_id ? "#eef2ff" : "#fff", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "20px",
+                            border:
+                              assistente?.player_id === parceiro.player_id
+                                ? "2px solid #007bff"
+                                : "1px solid #cbd5e1",
+                            background:
+                              assistente?.player_id === parceiro.player_id
+                                ? "#eef2ff"
+                                : "#fff",
+                            fontSize: "12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
                         >
                           #{parceiro.camisa} {parceiro.nome}
                         </button>
                       ))}
                   </div>
                 ) : (
-                  <div style={{ fontSize: "12px", color: "#dc3545", fontStyle: "italic" }}>* Ponto será computado para o time adversário.</div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#dc3545",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    * Ponto será computado para o time adversário.
+                  </div>
                 )}
               </div>
             )}
@@ -495,7 +990,17 @@ export default function LiveMatchPage({ user, onNavigate }) {
             <button
               onClick={handleSalvarGol}
               disabled={!artilheiro}
-              style={{ width: "100%", padding: "14px", background: !artilheiro ? "#cbd5e1" : "#007bff", color: "white", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", cursor: !artilheiro ? "not-allowed" : "pointer" }}
+              style={{
+                width: "100%",
+                padding: "14px",
+                background: !artilheiro ? "#cbd5e1" : "#007bff",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                fontSize: "16px",
+                fontWeight: "bold",
+                cursor: !artilheiro ? "not-allowed" : "pointer",
+              }}
             >
               ✔ Confirmar Gol
             </button>
