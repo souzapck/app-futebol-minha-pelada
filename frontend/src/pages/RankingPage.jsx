@@ -1,5 +1,6 @@
 import { useState } from "react";
 import GoalsRankingPage from "./GoalsRankingPage.jsx";
+import AssistRankingPage from "./AssistRankingPage.jsx";
 import BallRankingPage from "./BallRankingPage.jsx";
 import PointsRankingPage from "./PointsRankingPage";
 
@@ -31,6 +32,21 @@ export default function RankingPage() {
           }}
         >
           ⚽ Artilharia
+        </button>
+
+        <button
+          onClick={() => setSubView("assists")}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "20px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold",
+            background: subView === "assists" ? "#007bff" : "#eee",
+            color: subView === "assists" ? "white" : "#333"
+          }}
+        >
+          👟 Garçons
         </button>
 
         <button
@@ -66,6 +82,7 @@ export default function RankingPage() {
       </div>
 
       {subView === "goals" && <GoalsRankingPage />}
+      {subView === "assists" && <AssistRankingPage />}
       {subView === "ball" && <BallRankingPage />}
       {subView === "points" && <PointsRankingPage />}
       
