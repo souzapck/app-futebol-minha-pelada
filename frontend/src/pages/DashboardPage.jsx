@@ -13,8 +13,10 @@ export default function DashboardPage({ user, onNavigate }) {
     const buscarJogoDeHoje = async () => {
       if (!activeGroup || !user) return;
 
-      // Pega a data de hoje no formato YYYY-MM-DD
-      const dataHoje = new Date().toISOString().split("T")[0];
+      // 👉 CORREÇÃO DO FUSO HORÁRIO: PEGA A DATA LOCAL DO APARELHO
+      // Garante que 21:00 no Brasil não vire meia-noite do dia seguinte em UTC
+      const hoje = new Date();
+      const dataHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
 
       try {
         // 1. Busca a partida de hoje trazendo também os placares para validação de trava
